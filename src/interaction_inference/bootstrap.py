@@ -4,6 +4,17 @@ Module to compute confidence intervals from data for use in optimization.
 Given a sample of pairs of counts from a pair of genes, e.g. scRNA-seq data, 
 use bootstrap resampling to compute confidence interval bounds on the joint
 and marginal distributions of the sample.
+
+Typical example:
+
+# get sample e.g. from dataset
+sample = count_dataset.loc['Gene-pair-10'])
+
+# create generator with fixed seed
+rng = np.random.default_rng(200)
+
+# run bootstrap
+result_dict = bootstrap(rng, sample, splits=10, beta=0.5)
 '''
 
 # ------------------------------------------------
