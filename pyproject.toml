@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "interaction-inference"
+version = "0.0.1"
+description = "Infer gene interaction via constrained optimization"
+licence = {file = "LICENSE"}
+readme = "README.md"
+
+authors = [
+  { name="William Hilton", email="williamjgh2000@gmail.com" },
+]
+
+keywords = ["scRNA-seq", "inference", "optimization"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+requires-python = ">=3.8"
+dependencies = [
+]
+
+[project.optional-dependencies]
+
+[project.urls]
+Repository = "https://github.com/willjgh/interaction-inference"
