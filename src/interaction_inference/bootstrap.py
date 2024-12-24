@@ -14,7 +14,7 @@ sample = count_dataset.loc['Gene-pair-10'])
 rng = np.random.default_rng(200)
 
 # run bootstrap
-result_dict = bootstrap(rng, sample, splits=10, beta=0.5)
+bounds = bootstrap(rng, sample, splits=10, beta=0.5)
 '''
 
 # ------------------------------------------------

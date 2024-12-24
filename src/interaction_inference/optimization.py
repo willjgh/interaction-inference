@@ -1,6 +1,15 @@
 '''
-Module for optimization methods of inference
-Require confidence intervals and truncations to define optimization constraints
+Module for optimization inference methods
+
+Given bootstrap confidence intervals (and truncations) from a sample, construct
+constraints and optimize to detect if interaction is present or not.
+
+Typical example:
+
+# 'bounds' dictionary computed using bootstrap
+
+# apply optimization method
+results = optimization_hyp(bounds, 0.5)
 '''
 
 # ------------------------------------------------
