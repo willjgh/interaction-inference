@@ -8,7 +8,7 @@ and marginal distributions of the sample.
 Typical example:
 
 # get sample e.g. from dataset
-sample = count_dataset.loc['Gene-pair-10'])
+sample = count_dataset.loc['Gene-pair-10']
 
 # create generator with fixed seed
 rng = np.random.default_rng(200)

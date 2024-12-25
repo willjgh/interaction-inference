@@ -5,6 +5,23 @@ Simulate stochastic reaction network models using the gillespie algorithm to
 produce stationary samples emulating single-cell RNA sequencing observations.
 Simulate datatsets of samples from large numbers of genes by sampling model
 parameters from distributions fitted to match observed data.
+
+Typical example:
+
+# create generator with fixed seed
+rng = np.random.default_rng(200)
+
+# set model parameters
+params = {
+    'k_tx_1': 1,
+    'k_tx_2': 1,
+    'k_deg_1': 1,
+    'k_deg_2': 1,
+    'k_reg': 1
+}
+
+# simulate sample
+sample = gillespie(rng, params, 1000, 0.5)
 '''
 
 # ------------------------------------------------
