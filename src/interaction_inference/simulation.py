@@ -38,14 +38,39 @@ import matplotlib.pyplot as plt
 
 def gillespie(rng, params, n, beta, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
     '''
-    Simulate a sample path of the birth death regulation model
-    Sample n values at intervals of ts after a burn-in time of tmax
+    Simulate a sample path of birth-death regulation model.
 
-    params: dict of reaction rate constants
-    n: number of samples
-    beta: capture efficiency, list of length n (per cell) or single value
-    tmax: burn in time
-    ts: time between samples
+    Gillespie algorithm to simulate a sample path of the markov chain described
+    by the birth-death regulation stochastic reaction network model with given
+    parameters. After a burn-in time of 'tmax' samples are taken from the sample
+    path at time intervals of 'ts'. The states / samples are pairs of counts
+    (x1, x2) from a pair of genes.
+
+    Args:
+        rng: numpy default rng object
+        params: dict of reaction rate constants 'k_tx_1', 'k_tx_2', 'k_deg_1',
+                'k_deg_2', 'k_deg'
+        n: sample size
+        beta: per cell capture efficiency vector of size n / single value
+        tmax: burn-in time of simulation
+        ts: time between samples
+        plot: toggle plotting of sample path
+        intitial_state: starting state of simulation
+
+    Returns:
+        A dictionary containing results
+
+        Samples without capture efficiency
+
+        'x1_OG': n samples from gene 1
+        'x2_OG': n samples from gene 2
+        'OG': n pairs of samples
+
+        Samples with capture efficiency
+
+        'x1_OB': n samples from gene 1 affected by capture efficiency
+        'x2_OB': n samples from gene 2 affected by capture efficiency
+        'OB': n pairs of samples affected by capture efficiency
     '''
 
     # initialise time and state
@@ -141,3 +166,112 @@ def gillespie(rng, params, n, beta, tmax=100, ts=10, plot=False, initial_state=(
     }
 
     return data
+
+def dataset_simulation(rng, beta, gene_pairs=100, cells=1000, interaction=True,
+                       conditional=False, sig=0.5, plot=False):
+    '''
+    Produce dataset of gene pairs' simulated parameters and samples.
+
+    Produce a dataset of pairs of genes where for each pair parameters of a
+    birth-death regulation model are simulated, and then a sample of size
+    'cells' is simulated from the model. Parameters are sampled from log-uniform 
+    distributions informed by single cell RNA sequencing experiments to produce
+    realistic data. The paramters and samples are returned in a dictionary of 2
+    pandas dataframes.
+
+    Args:
+        rng: numpy default rng object
+        beta: per cell capture efficiency vector / single value
+        gene_pairs: number of gene pairs to simulate
+        cells: number of samples to simulate per gene pair
+        interaction: toggle if the interation parameter 'k_reg' is sampled (True)
+                     or set to 0 (False)
+        conditional: toggle if model parameters for each gene in the pair are
+                     sampled independently (False) or conditionally (True)
+        sig: standard deviation about common value for parameters of each gene
+             during conditional sampling 
+        plot: toggle plotting a scatter plot of the simulated parameters
+
+    Returns:
+        A dictionary containing results
+
+        'params_df': pandas dataframe of model parameters per gene-pair
+        'counts_df': pandas dataframe of sampled counts per gene-pair
+    '''
+
+    # dataframes
+    params_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=['k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
+    counts_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=[f"Cell-{j}" for j in range(cells)])
+
+    # for each gene
+    for i in range(gene_pairs):
+
+        # Simulate reaction rate parameters 
+
+        # conditional sampling
+        if conditional:
+
+            # sample log-mean capture efficiency
+            log_mean = rng.uniform(-0.5, 1.5)
+
+            # sample from normal distribution about the log-mean
+            log_mean_1 = rng.normal(log_mean, sig)
+            log_mean_2 = rng.normal(log_mean, sig)
+
+            # sample degradation rates for each gene
+            log_k_deg_1 = rng.uniform(-1, 0)
+            log_k_deg_2 = rng.uniform(-1, 0)
+
+            # compute transcription rates using log-mean and deg rate
+            log_k_tx_beta_1 = log_mean_1 + log_k_deg_1
+            log_k_tx_beta_2 = log_mean_2 + log_k_deg_2
+
+            # sample interaction strength
+            if interaction: log_k_reg = rng.uniform(-1, 1)
+
+        # independent sampling
+        else:
+
+            # sample rates from log-uniform distribution for both genes
+            log_k_tx_beta_1 = rng.uniform(-1, 1.5)
+            log_k_tx_beta_2 = rng.uniform(-1, 1.5)
+            log_k_deg_1 = rng.uniform(-1, 0)
+            log_k_deg_2 = rng.uniform(-1, 0)
+            if interaction: log_k_reg = rng.uniform(-2, 2)
+
+        # exponentiate and scale
+        k_tx_1 = (10 ** log_k_tx_beta_1) / np.mean(beta)
+        k_tx_2 = (10 ** log_k_tx_beta_2) / np.mean(beta)
+        k_deg_1 = 10 ** log_k_deg_1
+        k_deg_2 = 10 ** log_k_deg_2
+        if interaction:
+            k_reg = 10 ** log_k_reg
+        else:
+            k_reg = 0
+
+        # store parameters
+        params_df.iloc[i] = [k_tx_1, k_tx_2, k_deg_1, k_deg_2, k_reg]
+
+        params = {
+            'k_tx_1': k_tx_1,
+            'k_tx_2': k_tx_2,
+            'k_deg_1': k_deg_1,
+            'k_deg_2': k_deg_2,
+            'k_reg': k_reg
+        }
+
+        # simulate sample from model
+        sample = gillespie(params, cells, beta, tmax=100, ts=10)
+
+        # store counts
+        counts_df.iloc[i] = sample['OB']
+
+    # plot
+    if plot:
+        plt.scatter(np.log10(params_df['k_tx_1'].astype(np.float64)) - np.log10(params_df['k_deg_1'].astype(np.float64)), np.log10(params_df['k_tx_2'].astype(np.float64)) - np.log10(params_df['k_deg_2'].astype(np.float64)))
+        plt.xlabel("log(k_tx_1 / k_deg_1)")
+        plt.ylabel("log(k_tx_2 / k_deg_2)")
+        plt.title("Scatter plot of gene-pair parameters")
+        plt.show()
+
+    return {'params_df': params_df, 'counts_df': counts_df}
