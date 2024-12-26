@@ -351,8 +351,6 @@ def optimization_hyp(bounds, beta, settings=None, time_limit=300, silent=True,
 
     return solution
 
-# ------------------------------------------------
-
 def optimization_hyp_WLS(licence_file, bounds, beta, settings=None, time_limit=300, silent=True,
                          K=100, print_solution=True, print_truncation=True,
                          truncations={}, truncationsM={}, thresh_OG=10**-6, threshM_OG=10**-6):
@@ -687,9 +685,6 @@ def optimization_hyp_WLS(licence_file, bounds, beta, settings=None, time_limit=3
 
     return solution
 
-
-# ------------------------------------------------
-
 def optimization_min(bounds, beta, settings=None, time_limit=300, silent=True,
                      K=100, print_solution=True, print_truncation=True,
                      truncations={}, truncationsM={}, thresh_OG=10**-6, threshM_OG=10**-6,
@@ -901,8 +896,6 @@ def optimization_min(bounds, beta, settings=None, time_limit=300, silent=True,
         print(f"Runtime: {solution['time']}")
 
     return solution
-
-# ------------------------------------------------
 
 def optimization_min_WLS(license_file, bounds, beta, settings=None, time_limit=300, silent=True,
                          K=100, print_solution=True, print_truncation=True,
