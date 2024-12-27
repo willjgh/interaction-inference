@@ -54,7 +54,7 @@ def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_
 
         Sample information:
 
-        'samples': original sample used
+        'sample': original sample used
         'sample_counts': occurances of each state pair in the original sample
         'sample_counts_x1': occurances of each state in the original sample (gene 1)
         'sample_counts_x2': occurances of each state in the original sample (gene 2)
@@ -76,44 +76,44 @@ def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_
     '''
 
     # sample size
-    n = len(samples)
+    n = len(sample)
 
     # simulate data
     #data = simulation(params, n, beta, tmax, ts, plot=False, initial_state=(0, 0))
 
     # extract obserbed data
-    #samples = data['OB']
+    #sample = data['OB']
 
     # compute maximum x1 and x2 values
-    M, N = np.max(samples, axis=0)
+    M, N = np.max(sample, axis=0)
     M, N = int(M), int(N)
 
     # map (x1, x2) pairs to integers: x2 + (N + 1) * x1
-    integer_samples = np.array([x[1] + (N + 1)*x[0] for x in samples], dtype='uint32')
+    integer_sample = np.array([x[1] + (N + 1)*x[0] for x in sample], dtype='uint32')
 
     # maxiumum of integer sample
     D = (M + 1)*(N + 1) - 1
 
     # number of bootstrap samples per split
-    BS_split = BS // splits
+    resamples_split = resamples // splits
 
     # setup count array
-    counts = np.empty((BS, M + 1, N + 1), dtype='uint32')
+    counts = np.empty((resamples, M + 1, N + 1), dtype='uint32')
 
     # BS bootstrap samples: split into 'splits' number of BS_split x n arrays
     for split in tqdm.tqdm(range(splits)):
 
         # BS_split bootstrap samples as BS_split x n array
-        bootstrap_split = rng.choice(integer_samples, size=(BS_split, n))
+        bootstrap_split = rng.choice(integer_sample, size=(resamples_split, n))
 
         # offset row i by (D + 1)i
-        bootstrap_split += np.arange(BS_split, dtype='uint32')[:, None]*(D + 1)
+        bootstrap_split += np.arange(resamples_split, dtype='uint32')[:, None]*(D + 1)
 
         # flatten, count occurances of each state and reshape, reversing map to give counts of each (x1, x2) pair
-        counts_split = np.bincount(bootstrap_split.ravel(), minlength=BS_split*(D + 1)).reshape(-1, M + 1, N + 1)
+        counts_split = np.bincount(bootstrap_split.ravel(), minlength=resamples_split*(D + 1)).reshape(-1, M + 1, N + 1)
 
         # add to counts
-        counts[(split * BS_split):((split + 1) * BS_split), :, :] = counts_split
+        counts[(split * resamples_split):((split + 1) * resamples_split), :, :] = counts_split
 
     # sum over columns / rows to give counts (/n) of each x1 / x2 state
     x1_counts = counts.sum(axis=2)
@@ -130,7 +130,7 @@ def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_
     x2_bounds = x2_bounds / n
 
     # count occurances per (x1, x2) in the in original sample
-    sample_counts = np.bincount(integer_samples, minlength=D + 1).reshape(M + 1, N + 1)
+    sample_counts = np.bincount(integer_sample, minlength=D + 1).reshape(M + 1, N + 1)
 
     # sum over columns / rows to give counts per x1 / x2 state
     x1_sample_counts = sample_counts.sum(axis=1)
@@ -264,7 +264,7 @@ def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_
         print(f"Marginal x2 truncation: [{minM_x2_OB}, {maxM_x2_OB}]")
 
     results =  {
-        'samples': samples,
+        'sample': sample,
         'sample_counts': sample_counts,
         'sample_counts_x1': x1_sample_counts,
         'sample_counts_x2': x2_sample_counts,
