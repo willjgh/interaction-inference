@@ -22,7 +22,7 @@ classifiers = [
 
 requires-python = ">=3.8"
 dependencies = [
-    "numpy",
+    "numpy<2",
     "scipy",
     "matplotlib",
     "gurobipy==11.0",
