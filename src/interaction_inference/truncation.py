@@ -63,7 +63,7 @@ def compute_state_trunc(x1_OB, x2_OB, beta, thresh_OG):
         x2_OG_diag = np.array([x2_OB + diag - i for i in range(diag + 1)])
 
         # compute coeffs
-        coeffs = scipy.stats.binom.pmf(x1_OB, x1_OG_diag, beta) * scipy.stats.binom.pmf(x2_OB, x2_OG_diag, beta)
+        coeffs = B_coeff(x1_OB, x2_OB, x1_OG_diag, x2_OG_diag, beta)
 
         # find where above threshold
         idxs = np.argwhere(coeffs > 10**-6).reshape(-1)
@@ -121,7 +121,7 @@ def compute_state_truncM(x_OB, beta, threshM_OG):
 
     # start at first non-zero coefficient
     x_OG = x_OB
-    coeff = BM(x_OB, x_OG, beta)
+    coeff = BM_coeff(x_OB, x_OG, beta)
 
     # if not above threshold: increment until above
     while coeff < threshM_OG:
@@ -130,7 +130,7 @@ def compute_state_truncM(x_OB, beta, threshM_OG):
         x_OG += 1
 
         # compute coeff
-        coeff = BM(x_OB, x_OG, beta)
+        coeff = BM_coeff(x_OB, x_OG, beta)
 
     # store first state coeff >= thresh
     minM_OG = x_OG
@@ -142,7 +142,7 @@ def compute_state_truncM(x_OB, beta, threshM_OG):
         x_OG += 1
 
         # compute coeff
-        coeff = BM(x_OB, x_OG, beta)
+        coeff = BM_coeff(x_OB, x_OG, beta)
 
     # store last state with coeff >= thresh (INCLUSIVE BOUND)
     maxM_OG = x_OG - 1
@@ -156,7 +156,6 @@ def compute_truncation(size, beta, thresh_OG, filename=None):
     size: grid size of observed pairs that truncations are computed for
     beta: capture efficiency vector
     thresh_OG: threshold for trunction
-    filename: (optional) store resulting dictionary as filename.json
     '''
     # store in dictionary
     truncations = {}
@@ -166,7 +165,7 @@ def compute_truncation(size, beta, thresh_OG, filename=None):
         for x2_OB in range(x1_OB + 1):
 
             # compute truncation bounds
-            min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = findTrunc(x1_OB, x2_OB, beta, thresh_OG)
+            min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = compute_state_trunc(x1_OB, x2_OB, beta, thresh_OG)
 
             # store
             truncations[f'({x1_OB}, {x2_OB})'] = (min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG)
@@ -174,20 +173,15 @@ def compute_truncation(size, beta, thresh_OG, filename=None):
             # store symmetric version
             truncations[f'({x2_OB}, {x1_OB})'] = (min_x2_OG, max_x2_OG, min_x1_OG, max_x1_OG)
 
-    # optional
-    if filename:
-        json.dump(truncations, open(filename, 'w'))
-
     return truncations
 
-def compute_truncationM(size, beta, threshM_OG, filename=None):
+def compute_truncationM(size, beta, threshM_OG):
     '''
     Compute dict of original truncations
 
     size: number of states that truncations are computed for
     beta: capture efficiency vector
     threshM_OG: threshold for trunction
-    filename: (optional) store resulting dictionary as filename.json
     '''
     # store in dictionary
     truncations = {}
@@ -196,13 +190,9 @@ def compute_truncationM(size, beta, threshM_OG, filename=None):
     for x_OB in tqdm.tqdm(range(max)):
 
         # compute truncation bounds
-        minM_OG, maxM_OG = findTruncM(x_OB, beta, threshM_OG)
+        minM_OG, maxM_OG = compute_state_truncM(x_OB, beta, threshM_OG)
 
         # store
         truncations[f'{x_OB}'] = (minM_OG, maxM_OG)
-
-    # optional
-    if filename:
-        json.dump(truncations, open(filename, 'w'))
 
     return truncations
