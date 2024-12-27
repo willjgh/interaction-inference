@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 # Functions
 # ------------------------------------------------
 
-def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_OG=10, plot=False, printing=False):
+def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_OB=10, plot=False, printing=False):
     '''
     Compute confidence intervals of distribution of the sample.
 
@@ -171,7 +171,7 @@ def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_
 
     for x1 in range(M + 1):
         # below: replace
-        if x1_sample_counts[x1] < thresh_OB:
+        if x1_sample_counts[x1] < threshM_OB:
             x1_bounds[:, x1] = [0.0, 1.0]
         # above: update truncation
         else:
@@ -186,7 +186,7 @@ def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_
 
     for x2 in range(N + 1):
         # below: replace
-        if x2_sample_counts[x2] < thresh_OB:
+        if x2_sample_counts[x2] < threshM_OB:
             x2_bounds[:, x2] = [0.0, 1.0]
         # above: update truncation
         else:
