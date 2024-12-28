@@ -16,8 +16,10 @@ results = optimization_hyp(bounds, 0.5)
 # Dependencies
 # ------------------------------------------------
 
+from interaction_inference import truncation
 import gurobipy as gp
 from gurobipy import GRB
+import numpy as np
 import json
 import tqdm
 
@@ -106,7 +108,7 @@ def optimization_hyp(bounds, beta, settings=None, time_limit=300, silent=True,
 
             except KeyError:
                 # compute if not available
-                min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = findTrunc(x1_OB, x2_OB, beta, thresh_OG)
+                min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = truncation.compute_state_trunc(x1_OB, x2_OB, beta, thresh_OG)
 
                 # store
                 truncations[f'({x1_OB}, {x2_OB})'] = (min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG)
@@ -135,7 +137,7 @@ def optimization_hyp(bounds, beta, settings=None, time_limit=300, silent=True,
 
         except KeyError:
             # compute if not available
-            minM_x1_OG, maxM_x1_OG = findTruncM(x1_OB, beta, threshM_OG)
+            minM_x1_OG, maxM_x1_OG = truncation.compute_state_truncM(x1_OB, beta, threshM_OG)
 
             # store
             truncationsM[f'{x1_OB}'] = (minM_x1_OG, maxM_x1_OG)
@@ -155,7 +157,7 @@ def optimization_hyp(bounds, beta, settings=None, time_limit=300, silent=True,
 
         except KeyError:
             # compute if not available
-            minM_x2_OG, maxM_x2_OG = findTruncM(x2_OB, beta, threshM_OG)
+            minM_x2_OG, maxM_x2_OG = truncation.compute_state_truncM(x2_OB, beta, threshM_OG)
 
             # store
             truncationsM[f'{x2_OB}'] = (minM_x2_OG, maxM_x2_OG)
@@ -207,10 +209,10 @@ def optimization_hyp(bounds, beta, settings=None, time_limit=300, silent=True,
                 
                 # sum over truncation range (INCLUSIVE): drop terms with coefficients < thresh
                 sum_expr = gp.quicksum([
-                    B(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p1[x1_OG] * p2[x2_OG]
+                    truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p1[x1_OG] * p2[x2_OG]
                     for x1_OG in range(min_x1_OG, max_x1_OG + 1)
                     for x2_OG in range(min_x2_OG, max_x2_OG + 1)
-                    if B(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
+                    if truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
                 ])
                 
                 md.addConstr(sum_expr >= bounds['joint'][0, x1_OB, x2_OB], name=f"B lb {x1_OB}, {x2_OB}")
@@ -225,7 +227,7 @@ def optimization_hyp(bounds, beta, settings=None, time_limit=300, silent=True,
             minM_x1_OG, maxM_x1_OG = truncationsM[f'{x1_OB}']
 
             # sum over truncation range (INCLUSIVE)
-            sum_expr = gp.quicksum([BM(x1_OB, x1_OG, beta) * p1[x1_OG] for x1_OG in range(minM_x1_OG, maxM_x1_OG + 1)])
+            sum_expr = gp.quicksum([truncation.BM_coeff(x1_OB, x1_OG, beta) * p1[x1_OG] for x1_OG in range(minM_x1_OG, maxM_x1_OG + 1)])
 
             md.addConstr(sum_expr >= bounds['x1'][0, x1_OB], name=f"B marginal lb {x1_OB}")
             md.addConstr(sum_expr <= bounds['x1'][1, x1_OB], name=f"B marginal ub {x1_OB}")
@@ -236,7 +238,7 @@ def optimization_hyp(bounds, beta, settings=None, time_limit=300, silent=True,
             minM_x2_OG, maxM_x2_OG = truncationsM[f'{x2_OB}']
 
             # sum over truncation range (INCLUSIVE)
-            sum_expr = gp.quicksum([BM(x2_OB, x2_OG, beta) * p2[x2_OG] for x2_OG in range(minM_x2_OG, maxM_x2_OG + 1)])
+            sum_expr = gp.quicksum([truncation.BM_coeff(x2_OB, x2_OG, beta) * p2[x2_OG] for x2_OG in range(minM_x2_OG, maxM_x2_OG + 1)])
 
             md.addConstr(sum_expr >= bounds['x2'][0, x2_OB], name=f"B marginal lb {x2_OB}")
             md.addConstr(sum_expr <= bounds['x2'][1, x2_OB], name=f"B marginal ub {x2_OB}")
@@ -440,7 +442,7 @@ def optimization_hyp_WLS(licence_file, bounds, beta, settings=None, time_limit=3
 
                     except KeyError:
                         # compute if not available
-                        min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = findTrunc(x1_OB, x2_OB, beta, thresh_OG)
+                        min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = truncation.compute_state_trunc(x1_OB, x2_OB, beta, thresh_OG)
 
                         # store
                         truncations[f'({x1_OB}, {x2_OB})'] = (min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG)
@@ -469,7 +471,7 @@ def optimization_hyp_WLS(licence_file, bounds, beta, settings=None, time_limit=3
 
                 except KeyError:
                     # compute if not available
-                    minM_x1_OG, maxM_x1_OG = findTruncM(x1_OB, beta, threshM_OG)
+                    minM_x1_OG, maxM_x1_OG = truncation.compute_state_truncM(x1_OB, beta, threshM_OG)
 
                     # store
                     truncationsM[f'{x1_OB}'] = (minM_x1_OG, maxM_x1_OG)
@@ -489,7 +491,7 @@ def optimization_hyp_WLS(licence_file, bounds, beta, settings=None, time_limit=3
 
                 except KeyError:
                     # compute if not available
-                    minM_x2_OG, maxM_x2_OG = findTruncM(x2_OB, beta, threshM_OG)
+                    minM_x2_OG, maxM_x2_OG = truncation.compute_state_truncM(x2_OB, beta, threshM_OG)
 
                     # store
                     truncationsM[f'{x2_OB}'] = (minM_x2_OG, maxM_x2_OG)
@@ -541,10 +543,10 @@ def optimization_hyp_WLS(licence_file, bounds, beta, settings=None, time_limit=3
                         
                         # sum over truncation range (INCLUSIVE): drop terms with coefficients < thresh
                         sum_expr = gp.quicksum([
-                            B(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p1[x1_OG] * p2[x2_OG]
+                            truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p1[x1_OG] * p2[x2_OG]
                             for x1_OG in range(min_x1_OG, max_x1_OG + 1)
                             for x2_OG in range(min_x2_OG, max_x2_OG + 1)
-                            if B(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
+                            if truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
                         ])
                         
                         md.addConstr(sum_expr >= bounds['joint'][0, x1_OB, x2_OB], name=f"B lb {x1_OB}, {x2_OB}")
@@ -559,7 +561,7 @@ def optimization_hyp_WLS(licence_file, bounds, beta, settings=None, time_limit=3
                     minM_x1_OG, maxM_x1_OG = truncationsM[f'{x1_OB}']
 
                     # sum over truncation range (INCLUSIVE)
-                    sum_expr = gp.quicksum([BM(x1_OB, x1_OG, beta) * p1[x1_OG] for x1_OG in range(minM_x1_OG, maxM_x1_OG + 1)])
+                    sum_expr = gp.quicksum([truncation.BM_coeff(x1_OB, x1_OG, beta) * p1[x1_OG] for x1_OG in range(minM_x1_OG, maxM_x1_OG + 1)])
 
                     md.addConstr(sum_expr >= bounds['x1'][0, x1_OB], name=f"B marginal lb {x1_OB}")
                     md.addConstr(sum_expr <= bounds['x1'][1, x1_OB], name=f"B marginal ub {x1_OB}")
@@ -570,7 +572,7 @@ def optimization_hyp_WLS(licence_file, bounds, beta, settings=None, time_limit=3
                     minM_x2_OG, maxM_x2_OG = truncationsM[f'{x2_OB}']
 
                     # sum over truncation range (INCLUSIVE)
-                    sum_expr = gp.quicksum([BM(x2_OB, x2_OG, beta) * p2[x2_OG] for x2_OG in range(minM_x2_OG, maxM_x2_OG + 1)])
+                    sum_expr = gp.quicksum([truncation.BM_coeff(x2_OB, x2_OG, beta) * p2[x2_OG] for x2_OG in range(minM_x2_OG, maxM_x2_OG + 1)])
 
                     md.addConstr(sum_expr >= bounds['x2'][0, x2_OB], name=f"B marginal lb {x2_OB}")
                     md.addConstr(sum_expr <= bounds['x2'][1, x2_OB], name=f"B marginal ub {x2_OB}")
@@ -765,7 +767,7 @@ def optimization_min(bounds, beta, settings=None, time_limit=300, silent=True,
 
             except KeyError:
                 # compute if not available
-                min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = findTrunc(x1_OB, x2_OB, beta, thresh_OG)
+                min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = truncation.compute_state_trunc(x1_OB, x2_OB, beta, thresh_OG)
 
                 # store
                 truncations[f'({x1_OB}, {x2_OB})'] = (min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG)
@@ -815,10 +817,10 @@ def optimization_min(bounds, beta, settings=None, time_limit=300, silent=True,
             
             # sum over truncation range (INCLUSIVE): drop terms with coefficients < thresh
             sum_expr = gp.quicksum([
-                B(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p1[x1_OG] * p2[x2_OG]
+                truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p[x1_OG, x2_OG]
                 for x1_OG in range(min_x1_OG, max_x1_OG + 1)
                 for x2_OG in range(min_x2_OG, max_x2_OG + 1)
-                if B(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
+                if truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
             ])
             
             md.addConstr(sum_expr >= bounds['joint'][0, x1_OB, x2_OB], name=f"B lb {x1_OB}, {x2_OB}")
@@ -986,7 +988,7 @@ def optimization_min_WLS(license_file, bounds, beta, settings=None, time_limit=3
 
                     except KeyError:
                         # compute if not available
-                        min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = findTrunc(x1_OB, x2_OB, beta, thresh_OG)
+                        min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = truncation.compute_state_trunc(x1_OB, x2_OB, beta, thresh_OG)
 
                         # store
                         truncations[f'({x1_OB}, {x2_OB})'] = (min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG)
@@ -1036,10 +1038,10 @@ def optimization_min_WLS(license_file, bounds, beta, settings=None, time_limit=3
                     
                     # sum over truncation range (INCLUSIVE): drop terms with coefficients < thresh
                     sum_expr = gp.quicksum([
-                        B(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p1[x1_OG] * p2[x2_OG]
+                        truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p[x1_OG, x2_OG]
                         for x1_OG in range(min_x1_OG, max_x1_OG + 1)
                         for x2_OG in range(min_x2_OG, max_x2_OG + 1)
-                        if B(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
+                        if truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
                     ])
                     
                     md.addConstr(sum_expr >= bounds['joint'][0, x1_OB, x2_OB], name=f"B lb {x1_OB}, {x2_OB}")
