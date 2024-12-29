@@ -31,6 +31,8 @@ sample = gillespie(rng, params, 1000, 0.5)
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+import pandas as pd
+import tqdm
 
 # ------------------------------------------------
 # Functions
@@ -204,7 +206,7 @@ def dataset_simulation(rng, beta, gene_pairs=100, cells=1000, interaction=True,
     counts_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=[f"Cell-{j}" for j in range(cells)])
 
     # for each gene
-    for i in range(gene_pairs):
+    for i in tqdm.tqdm(range(gene_pairs)):
 
         # Simulate reaction rate parameters 
 
@@ -261,7 +263,7 @@ def dataset_simulation(rng, beta, gene_pairs=100, cells=1000, interaction=True,
         }
 
         # simulate sample from model
-        sample = gillespie(params, cells, beta, tmax=100, ts=10)
+        sample = gillespie(rng, params, cells, beta)
 
         # store counts
         counts_df.iloc[i] = sample['OB']
