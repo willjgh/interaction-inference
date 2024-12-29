@@ -175,7 +175,7 @@ def scatter_results(params_df, results_dict, method):
 # Classification Functions
 # ------------------------------------------------
 
-def confusion_matrix(params_df, result_dict):
+def confusion_matrix(params_df, result_dict, method):
     '''
     Produce confusion matrix dictionary from a result dictionary and true params.
     '''
@@ -308,7 +308,7 @@ def display_metrics(confusion_matrix):
     cm = sns.light_palette("blue", as_cmap=True)
     return confusion_matrix_df.style.format(precision=2).background_gradient(cmap=cm, axis=None)
 
-def classification_performance(params_df_list, results_dict_list):
+def classification_performance(params_df_list, results_dict_list, method):
     '''
     Produce and display confusion matrix and related classification metrics
     given a range of results and true paramters
@@ -322,7 +322,7 @@ def classification_performance(params_df_list, results_dict_list):
         params_df = params_df_list[i]
 
         # compute confusion matrix
-        confusion_matrix = confusion_matrix(params_df, results_dict)
+        confusion_matrix = confusion_matrix(params_df, results_dict, method)
 
         # add to overall
         confusion_matrix_overall = add_confusion_matrices(confusion_matrix, confusion_matrix_overall)
