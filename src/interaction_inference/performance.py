@@ -8,6 +8,7 @@ Module to implement functions for analysis of performance on results on datsets.
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 import math
 
@@ -16,7 +17,7 @@ import math
 # ------------------------------------------------
 
 # plotting code
-def scatter_parameters(params_df)
+def scatter_parameters(params_df):
     '''
     Produce scatter plot of parameters of the dataset.
     '''
@@ -24,22 +25,22 @@ def scatter_parameters(params_df)
     # select set
     fig, axs = plt.subplots(1, figsize=(12, 12))
 
-    sc = axs[0].scatter(
-        np.log10(params_df['k_tx_1']) - np.log10(params_df['k_deg_1']),
-        np.log10(params_df['k_tx_2']) - np.log10(params_df['k_deg_2']),
-        c=np.log10(params_df['k_reg']),
+    sc = axs.scatter(
+        np.log10(params_df['k_tx_1'].astype(np.float64)) - np.log10(params_df['k_deg_1'].astype(np.float64)),
+        np.log10(params_df['k_tx_2'].astype(np.float64)) - np.log10(params_df['k_deg_2'].astype(np.float64)),
+        c=np.log10(params_df['k_reg'].astype(np.float64)),
         label="Colour = log(k_reg)",
         cmap=plt.cm.viridis
     )
 
     plt.colorbar(sc)
-    axs[0].set_xlabel("log(k_tx_1 / k_deg_1)")
-    axs[0].set_ylabel("log(k_tx_2 / k_deg_2)")
-    axs[0].set_title(f"Distribution of parameters in dataset")
-    axs[0].legend()
+    axs.set_xlabel("log(k_tx_1 / k_deg_1)")
+    axs.set_ylabel("log(k_tx_2 / k_deg_2)")
+    axs.set_title(f"Distribution of parameters in dataset")
+    axs.legend()
     plt.show()
 
-def scatter_results(params_df, results_dict, method):
+def scatter_results(params_df, result_dict, method):
     '''
     Scatter plot gene-pair parameters, coloured by correct / false detection.
     '''
@@ -59,7 +60,7 @@ def scatter_results(params_df, results_dict, method):
     blue_label_needed = True
 
     # loop over each gene-pair
-    for key, val in results_dict.items():
+    for key, val in result_dict.items():
 
         # reset label
         label = None
@@ -155,7 +156,7 @@ def scatter_results(params_df, results_dict, method):
     # format parameter scatter
     axs[0].set_xlabel("log(k_tx_1 / k_deg_1)")
     axs[0].set_ylabel("log(k_tx_2 / k_deg_2)")
-    axs[0].set_title(f"Distribution of parameters and detection results for {suffix}")
+    axs[0].set_title(f"Distribution of parameters and detection results for {method} method")
     axs[0].legend()
 
     # format time histogram
@@ -175,19 +176,19 @@ def scatter_results(params_df, results_dict, method):
 # Classification Functions
 # ------------------------------------------------
 
-def confusion_matrix(params_df, result_dict, method):
+def compute_confusion_matrix(params_df, result_dict, method):
     '''
     Produce confusion matrix dictionary from a result dictionary and true params.
     '''
 
     # dataset size
-    n = len(results_dict)
+    n = len(result_dict)
 
     # store classification results
     confusion_matrix = {'TP': 0, 'FP': 0, 'FN': 0, 'TN': 0}
 
     # loop over gene pairs
-    for key, val in results_dict.items():
+    for key, val in result_dict.items():
 
         # access true parameters
         params = params_df.loc[f'Gene-pair-{key}']
@@ -267,7 +268,7 @@ def add_confusion_matrices(confusion_matrix_1, confusion_matrix_2):
     # combine
     for key in ['TP', 'FP', 'FN', 'TN']:
 
-        confusion_matrix[key] = (n_1 * confusion_matrix_1 + n_2 * confusion_matrix_2) / (n_1 + n_2)
+        confusion_matrix[key] = (n_1 * confusion_matrix_1[key] + n_2 * confusion_matrix_2[key]) / (n_1 + n_2)
 
     return confusion_matrix
 
@@ -308,21 +309,21 @@ def display_metrics(confusion_matrix):
     cm = sns.light_palette("blue", as_cmap=True)
     return confusion_matrix_df.style.format(precision=2).background_gradient(cmap=cm, axis=None)
 
-def classification_performance(params_df_list, results_dict_list, method):
+def classification_performance(params_df_list, result_dict_list, method):
     '''
     Produce and display confusion matrix and related classification metrics
     given a range of results and true paramters
     '''
 
     # store overall confusion matrix
-    confusion_matrix_overall = {}
+    confusion_matrix_overall = {'TP': 0, 'FP': 0, 'FN': 0, 'TN': 0}
 
     # iterate over pairs of results and true paramters
     for i, result_dict in enumerate(result_dict_list):
         params_df = params_df_list[i]
 
         # compute confusion matrix
-        confusion_matrix = confusion_matrix(params_df, results_dict, method)
+        confusion_matrix = compute_confusion_matrix(params_df, result_dict, method)
 
         # add to overall
         confusion_matrix_overall = add_confusion_matrices(confusion_matrix, confusion_matrix_overall)
