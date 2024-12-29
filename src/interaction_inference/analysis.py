@@ -11,7 +11,7 @@ from interaction_inference import optimization
 
 # dataset analysis script as function
 def dataset_analysis(rng, counts_df, beta, resamples=None, splits=None, thresh_OB=10, threshM_OB=10,
-                     method, settings=None, truncations={}, truncationsM={}, license_file, K=100,
+                     method="hyp", settings=None, truncations={}, truncationsM={}, license_file=None, K=100,
                      silent=True, print_solution=False, print_truncation=False, thresh_OG=10**-6, threshM_OG=10**-6,
                      time_limit=300, MIPGap=0.05, BestBdThresh=0.0001):
 
@@ -32,7 +32,7 @@ def dataset_analysis(rng, counts_df, beta, resamples=None, splits=None, thresh_O
     for i in tqdm.tqdm(range(gene_pairs)):
 
         # select sample
-        samples = list(counts_df.loc[f'Gene-pair-{i}'])
+        sample = list(counts_df.loc[f'Gene-pair-{i}'])
 
         if method == "hyp":
 
@@ -65,12 +65,12 @@ def dataset_analysis(rng, counts_df, beta, resamples=None, splits=None, thresh_O
                                                 thresh_OG, threshM_OG, MIPGap, BestBdThresh)
 
             else:
-                solution = optimization.optimization_min_WLS(bounds, beta, settings, time_limit, silent,
+                solution = optimization.optimization_min(bounds, beta, settings, time_limit, silent,
                                                 K, print_solution, print_truncation, truncations, truncationsM,
                                                 thresh_OG, threshM_OG, MIPGap, BestBdThresh)
 
             # store result
-            solution_dict[i] = {'bound': solution['k_reg'][0], 'status': solution['k_reg'][1], 'time': solution['time']}
+            solution_dict[i] = {'bound': solution['bound'], 'status': solution['status'], 'time': solution['time']}
 
         elif method == "pearson":
 
