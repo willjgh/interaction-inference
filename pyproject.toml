@@ -26,7 +26,10 @@ dependencies = [
     "scipy",
     "matplotlib",
     "gurobipy==11.0",
-    "tqdm"
+    "pandas",
+    "tqdm",
+    "seaborn",
+    "Jinja2"
 ]
 
 [project.optional-dependencies]
