@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 # Functions
 # ------------------------------------------------
 
-def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_OB=10, plot=False, printing=False):
+def bootstrap(sample, resamples=None, splits=1, beta=1.0, thresh_OB=10, threshM_OB=10, plot=False, printing=False):
     '''
     Compute confidence intervals of distribution of the sample.
 
@@ -38,11 +38,10 @@ def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_
     a threshold on the number of samples per interval to improve coverage.
 
     Args:
-        rng: numpy default rng object
         sample: list of tuples (x1, x2) of counts per cell
         resamples: number of bootstrap resamples (recommended = sample size)
         splits: perform bootstrap resampling over multiple splits to avoid
-                memory issues (recommended = resamples / 100)
+                memory issues (recommended = resamples / 100 for large values)
         beta: per cell capture efficiency vector / single value for all cells
         thresh_OB: observed truncation threshold
         threshM_OB: marginal observed truncation threshold
@@ -75,14 +74,15 @@ def bootstrap(rng, sample, resamples, splits=1, beta=1.0, thresh_OB=10, threshM_
         'thresh_flag_x2': bool if marginal state space was truncated (gene 2)
     '''
 
+    # initialize random generator
+    rng = np.random.default_rng()
+
     # sample size
     n = len(sample)
 
-    # simulate data
-    #data = simulation(params, n, beta, tmax, ts, plot=False, initial_state=(0, 0))
-
-    # extract obserbed data
-    #sample = data['OB']
+    # default bootstrap size to sample size
+    if resamples is None:
+        resamples = n
 
     # compute maximum x1 and x2 values
     M, N = np.max(sample, axis=0)
