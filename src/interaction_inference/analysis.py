@@ -2,12 +2,41 @@
 Module to analyse datasets using optimization and correlation inference methods.
 '''
 
+# ------------------------------------------------
+# Dependencies
+# ------------------------------------------------
+
 import scipy
 import tqdm
 import pandas as pd
 import numpy as np
 from interaction_inference import bootstrap
 from interaction_inference import optimization
+
+
+# ------------------------------------------------
+# Analysis settings class
+# ------------------------------------------------
+
+@dataclass
+class AnalysisSettings:
+    '''Class to store analysis settings and results.'''
+    resamples: int
+    splits: int
+    thresh_OB: int
+    threshM_OB: int
+    license_filename: str
+    constraint_settings: dict
+    time_limit: int = 300
+    silent: bool = True
+    K: int = 100
+    method: str
+    print_solution: bool = False
+    print_truncation: bool = False
+    MIPGap: float = 0.05
+    BestBdThresh: float = 0.0001
+    result_dict: dict
+    result_filename: str
 
 # dataset analysis script as function
 def dataset_analysis(rng, counts_df, beta, resamples=None, splits=None, thresh_OB=10, threshM_OB=10,
