@@ -149,7 +149,7 @@ def compute_state_truncM(x_OB, beta, threshM_OG):
 
     return minM_OG, maxM_OG
 
-def compute_truncation(size, beta, thresh_OG, filename=None):
+def compute_truncation(size, beta, thresh_OG):
     '''
     Compute dictionary of truncations for original state pairs
 
