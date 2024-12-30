@@ -38,7 +38,7 @@ import tqdm
 # Functions
 # ------------------------------------------------
 
-def gillespie(rng, params, n, beta, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
+def gillespie(params, n, beta, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
     '''
     Simulate a sample path of birth-death regulation model.
 
@@ -49,7 +49,6 @@ def gillespie(rng, params, n, beta, tmax=100, ts=10, plot=False, initial_state=(
     (x1, x2) from a pair of genes.
 
     Args:
-        rng: numpy default rng object
         params: dict of reaction rate constants 'k_tx_1', 'k_tx_2', 'k_deg_1',
                 'k_deg_2', 'k_deg'
         n: sample size
@@ -74,6 +73,9 @@ def gillespie(rng, params, n, beta, tmax=100, ts=10, plot=False, initial_state=(
         'x2_OB': n samples from gene 2 affected by capture efficiency
         'OB': n pairs of samples affected by capture efficiency
     '''
+
+    # initialize random generator
+    rng = np.random.default_rng()
 
     # initialise time and state
     t = 0
@@ -169,7 +171,7 @@ def gillespie(rng, params, n, beta, tmax=100, ts=10, plot=False, initial_state=(
 
     return data
 
-def dataset_simulation(rng, beta, gene_pairs=100, cells=1000, interaction=True,
+def dataset_simulation(beta, gene_pairs=100, cells=1000, interaction=True,
                        conditional=False, sig=0.5, plot=False):
     '''
     Produce dataset of gene pairs' simulated parameters and samples.
@@ -182,7 +184,6 @@ def dataset_simulation(rng, beta, gene_pairs=100, cells=1000, interaction=True,
     pandas dataframes.
 
     Args:
-        rng: numpy default rng object
         beta: per cell capture efficiency vector / single value
         gene_pairs: number of gene pairs to simulate
         cells: number of samples to simulate per gene pair
@@ -200,6 +201,9 @@ def dataset_simulation(rng, beta, gene_pairs=100, cells=1000, interaction=True,
         'params_df': pandas dataframe of model parameters per gene-pair
         'counts_df': pandas dataframe of sampled counts per gene-pair
     '''
+
+    # initialize random generator
+    rng = np.random.default_rng()
 
     # dataframes
     params_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=['k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
