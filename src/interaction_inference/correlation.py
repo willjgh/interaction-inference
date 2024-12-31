@@ -15,7 +15,7 @@ import pandas as pd
 # ------------------------------------------------
 
 class Correlation():
-    def __init__(self, method):
+    def __init__(self, method="pearson"):
         '''Initialize analysis settings and result storage.'''
 
         # analysis method settings

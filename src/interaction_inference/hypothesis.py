@@ -26,6 +26,7 @@ class Hypothesis():
         self.threshM_OB = 10
 
         # analysis method settings
+        self.method = "hyp"
         self.license_filename = None
         self.constraint_settings = None
         self.time_limit = 300
