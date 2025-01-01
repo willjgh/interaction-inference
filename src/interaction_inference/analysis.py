@@ -17,7 +17,7 @@ from interaction_inference import optimization
 # Analysis function
 # ------------------------------------------------
 
-def dataset_analysis(rng, counts_df, beta, resamples=None, splits=None, thresh_OB=10, threshM_OB=10,
+def dataset_analysis(counts_df, beta, resamples=None, splits=1, thresh_OB=10, threshM_OB=10,
                      method="hyp", settings=None, truncations={}, truncationsM={}, license_file=None, K=100,
                      silent=True, print_solution=False, print_truncation=False, thresh_OG=10**-6, threshM_OG=10**-6,
                      time_limit=300, MIPGap=0.05, BestBdThresh=0.0001):
@@ -28,9 +28,6 @@ def dataset_analysis(rng, counts_df, beta, resamples=None, splits=None, thresh_O
     # default bootstrap size to sample size
     if resamples is None:
         resamples = cells
-
-    # default bootstrap splits to resamples // 1000
-    splits = resamples // 1000
 
     # dict to store results
     solution_dict = {}
@@ -44,7 +41,7 @@ def dataset_analysis(rng, counts_df, beta, resamples=None, splits=None, thresh_O
         if method == "hyp":
 
             # bootstrap
-            bounds = bootstrap.bootstrap(rng, sample, resamples, splits, beta, thresh_OB, threshM_OB, plot=False, printing=False)
+            bounds = bootstrap.bootstrap(sample, resamples, splits, beta, thresh_OB, threshM_OB, plot=False, printing=False)
 
             # optimize: hyp
             if license_file:
@@ -63,7 +60,7 @@ def dataset_analysis(rng, counts_df, beta, resamples=None, splits=None, thresh_O
         elif method == "min":
 
             # bootstrap
-            bounds = bootstrap.bootstrap(rng, sample, resamples, splits, beta, thresh_OB, threshM_OB, plot=False, printing=False)
+            bounds = bootstrap.bootstrap(sample, resamples, splits, beta, thresh_OB, threshM_OB, plot=False, printing=False)
 
             # optimize: min
             if license_file:
