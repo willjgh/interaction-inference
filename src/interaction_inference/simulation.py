@@ -267,7 +267,7 @@ def dataset_simulation(beta, gene_pairs=100, cells=1000, interaction=True,
         }
 
         # simulate sample from model
-        sample = gillespie(rng, params, cells, beta)
+        sample = gillespie(params, cells, beta)
 
         # store counts
         counts_df.iloc[i] = sample['OB']
