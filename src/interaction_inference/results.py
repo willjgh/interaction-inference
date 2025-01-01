@@ -47,18 +47,18 @@ def scatter_parameters(dataset):
     axs.legend()
     plt.show()
 
-def scatter_results(dataset, result):
+def scatter_results(result):
     '''
     Scatter plot gene-pair parameters, coloured by correct / false detection.
     '''
 
     # exit if no paramters available
-    if dataset.param_dataset is None:
+    if result.dataset.param_dataset is None:
         print("No parameter dataset available")
         return None
 
     # get parameter dataset
-    params_df = dataset.param_dataset
+    params_df = result.dataset.param_dataset
 
     # set figure
     if (result.method == "hyp") or (result.method == "min"):
@@ -191,18 +191,18 @@ def scatter_results(dataset, result):
 # Classification Functions
 # ------------------------------------------------
 
-def compute_confusion_matrix(dataset, result):
+def compute_confusion_matrix(result):
     '''
-    Produce confusion matrix dictionary from a result dictionary and true params.
+    Produce confusion matrix dictionary from results.
     '''
 
     # exit if no paramters available
-    if dataset.param_dataset is None:
+    if result.dataset.param_dataset is None:
         print("No parameter dataset available")
         return None
 
     # get parameter dataset
-    params_df = dataset.param_dataset
+    params_df = result.dataset.param_dataset
 
     # dataset size
     n = len(result.result_dict)
@@ -332,21 +332,20 @@ def display_metrics(confusion_matrix):
     cm = sns.light_palette("blue", as_cmap=True)
     return confusion_matrix_df.style.format(precision=2).background_gradient(cmap=cm, axis=None)
 
-def classification_performance(dataset_list, result_list):
+def classification_performance(*result_tuple):
     '''
     Produce and display confusion matrix and related classification metrics
-    given a range of results and true paramters
+    given result(s): multiple results will be combined into one
     '''
 
     # store overall confusion matrix
     confusion_matrix_overall = {'TP': 0, 'FP': 0, 'FN': 0, 'TN': 0}
 
-    # iterate over pairs of results and true paramters
-    for i, result in enumerate(result_list):
-        dataset = dataset_list[i]
+    # iterate over results
+    for result in result_tuple:
 
         # compute confusion matrix
-        confusion_matrix = compute_confusion_matrix(dataset, result)
+        confusion_matrix = compute_confusion_matrix(result)
 
         # add to overall
         confusion_matrix_overall = add_confusion_matrices(confusion_matrix, confusion_matrix_overall)
