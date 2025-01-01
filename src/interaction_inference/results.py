@@ -171,7 +171,7 @@ def scatter_results(dataset, result):
     # format parameter scatter
     axs[0].set_xlabel("log(k_tx_1 / k_deg_1)")
     axs[0].set_ylabel("log(k_tx_2 / k_deg_2)")
-    axs[0].set_title(f"Distribution of parameters and detection results for {method} method")
+    axs[0].set_title(f"Distribution of parameters and detection results for {result.method} method")
     axs[0].legend()
 
     # format time histogram
