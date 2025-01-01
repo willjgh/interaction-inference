@@ -27,8 +27,8 @@ class Minimization():
 
         # analysis method settings
         self.method = "min"
-        self.license_filename = None
-        self.constraint_settings = None
+        self.license_file = None
+        self.settings = None
         self.time_limit = 300
         self.silent = True
         self.K = 100
@@ -37,14 +37,17 @@ class Minimization():
         self.MIPGap = 0.05
         self.BestBdThresh = 0.0001
 
+        # dataset used
+        self.dataset = None
+
         # results
         self.result_dict = None
 
-    def optimization_minimization(self):
-        pass
-
     def analyse_dataset(self, dataset):
         '''Analyse given dataset using method settings and store results.'''
+
+        # store reference to dataset used
+        self.dataset = dataset
 
         # dict to store results
         solution_dict = {}

@@ -21,11 +21,17 @@ class Correlation():
         # analysis method settings
         self.method = method
 
+        # dataset used
+        self.dataset = None
+
         # results
         self.result_dict = None
 
     def analyse_dataset(self, dataset):
         '''Analyse given dataset using method settings and store results.'''
+
+        # store reference to dataset used
+        self.dataset = dataset
 
         # dict to store results
         solution_dict = {}
