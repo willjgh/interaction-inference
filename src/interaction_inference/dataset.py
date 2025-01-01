@@ -6,9 +6,11 @@ Module implementing class to contain dataset settings.
 # Dependencies
 # ------------------------------------------------
 
-import dataclass
+from interaction_inference import simulation
 import pandas as pd
 import numpy as np
+import tqdm
+import matplotlib.pyplot as plt
 
 # ------------------------------------------------
 # Dataset settings class
@@ -167,7 +169,7 @@ class Dataset():
             }
 
             # simulate sample from model
-            sample = gillespie(rng, params, cells, beta)
+            sample = simulation.gillespie(params, cells, beta)
 
             # store counts
             counts_df.iloc[i] = sample['OB']
