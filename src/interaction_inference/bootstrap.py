@@ -22,7 +22,6 @@ bounds = bootstrap(rng, sample, splits=10, beta=0.5)
 # ------------------------------------------------
 
 import numpy as np
-import tqdm
 import matplotlib.pyplot as plt
 
 # ------------------------------------------------
@@ -101,7 +100,7 @@ def bootstrap(sample, resamples=None, splits=1, beta=1.0, thresh_OB=10, threshM_
     counts = np.empty((resamples, M + 1, N + 1), dtype='uint32')
 
     # BS bootstrap samples: split into 'splits' number of BS_split x n arrays
-    for split in tqdm.tqdm(range(splits)):
+    for split in range(splits):
 
         # BS_split bootstrap samples as BS_split x n array
         bootstrap_split = rng.choice(integer_sample, size=(resamples_split, n))
