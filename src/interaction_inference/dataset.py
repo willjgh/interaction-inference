@@ -72,7 +72,7 @@ class Dataset():
         # load json
         pass
 
-    def simulate_dataset(self, beta, gene_pairs, cells, interaction=True, conditional=False, sig=0.5, plot=False):
+    def simulate_dataset(self, beta, gene_pairs, cells, interaction_chance=0.5, conditional=False, sig=0.5, plot=False):
         '''
         Produce dataset of gene pairs' simulated parameters and samples.
 
@@ -87,8 +87,8 @@ class Dataset():
             beta: per cell capture efficiency vector / single value
             gene_pairs: number of gene pairs to simulate
             cells: number of samples to simulate per gene pair
-            interaction: toggle if the interation parameter 'k_reg' is sampled (True)
-                        or set to 0 (False)
+            interaction_chance: float in [0, 1], chance the interation parameter
+                                'k_reg' is sampled vs being set to 0 (no interaction)
             conditional: toggle if model parameters for each gene in the pair are
                         sampled independently (False) or conditionally (True)
             sig: standard deviation about common value for parameters of each gene
@@ -113,6 +113,13 @@ class Dataset():
 
         # for each gene
         for i in tqdm.tqdm(range(gene_pairs)):
+
+            # Select if interation or not
+            u = rng.uniform()
+            if u < interaction_chance:
+                interaction = True
+            else:
+                interaction = False
 
             # Simulate reaction rate parameters 
 
