@@ -42,7 +42,7 @@ class Dataset():
         self.truncations = {}
         self.truncationsM = {}
 
-    def load_dataset(self, beta, count_dataset_filename, param_dataset_filename=None):
+    def load_dataset(self, count_dataset_filename, beta=None, param_dataset_filename=None):
         '''Load dataset from csv files: paramter and count data'''
         self.count_dataset = pd.read_csv(count_dataset_filename, index_col=0)
         if param_dataset_filename:
@@ -72,7 +72,7 @@ class Dataset():
         # load json
         pass
 
-    def simulate_dataset(self, beta, gene_pairs, cells, interaction_chance=0.5, conditional=False, sig=0.5):
+    def simulate_dataset(self, beta, gene_pairs, cells, interaction_chance=0.5, conditional=True, sig=0.5):
         '''
         Produce dataset of gene pairs' simulated parameters and samples.
 
