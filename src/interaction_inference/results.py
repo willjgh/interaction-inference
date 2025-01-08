@@ -18,7 +18,18 @@ import math
 
 def scatter_parameters(dataset):
     '''
-    Produce scatter plot of parameters of the dataset.
+    Produce a scatter plot of parameters of a dataset.
+
+    For a simulated dataset with true parameters available produce a scatter
+    plot of the log mean expression of each gene pair when ignoring interaction
+    effects i.e. points (log(k_tx_1 / k_deg_1), log(k_tx_2 / k_deg_2)).
+    Gene pairs with interaction (k_reg > 0) are coloured by log interaction
+    strength with darker colours for smaller values, and those with no
+    interaction are coloured black.
+
+    Args:
+        dataset: instance of Dataset class whose 'param_dataset' attribute
+                 should not be None
     '''
 
     # exit if no paramters available
@@ -30,22 +41,36 @@ def scatter_parameters(dataset):
     params_df = dataset.param_dataset
 
     # setup plotting
-    fig, axs = plt.subplots(1, figsize=(12, 12))
+    fig, axs = plt.subplots()#1, figsize=(12, 12))
 
-    sc = axs.scatter(
-        np.log10(params_df['k_tx_1'].astype(np.float64)) - np.log10(params_df['k_deg_1'].astype(np.float64)),
-        np.log10(params_df['k_tx_2'].astype(np.float64)) - np.log10(params_df['k_deg_2'].astype(np.float64)),
-        c=np.log10(params_df['k_reg'].astype(np.float64)),
-        label="Colour = log(k_reg)",
-        cmap=plt.cm.viridis
+    # plot gene pairs with interaction (k_reg > 0)
+    params_interaction = params_df[params_df['k_reg'] > 0]
+
+    sc_int = axs.scatter(
+        np.log10(params_interaction['k_tx_1'].astype(np.float64)) - np.log10(params_interaction['k_deg_1'].astype(np.float64)),
+        np.log10(params_interaction['k_tx_2'].astype(np.float64)) - np.log10(params_interaction['k_deg_2'].astype(np.float64)),
+        c=np.log10(params_interaction['k_reg'].astype(np.float64)),
+        label="Interacting gene pairs",
+        cmap=plt.cm.plasma
     )
 
-    plt.colorbar(sc)
-    axs.set_xlabel("log(k_tx_1 / k_deg_1)")
-    axs.set_ylabel("log(k_tx_2 / k_deg_2)")
-    axs.set_title(f"Distribution of parameters in dataset")
+    # plot gene pairs with no interaction (k_reg = 0)
+    params_independent = params_df[params_df['k_reg'] == 0]
+
+    sc_ind = axs.scatter(
+        np.log10(params_independent['k_tx_1'].astype(np.float64)) - np.log10(params_independent['k_deg_1'].astype(np.float64)),
+        np.log10(params_independent['k_tx_2'].astype(np.float64)) - np.log10(params_independent['k_deg_2'].astype(np.float64)),
+        c='black',
+        label="Independent gene pairs"
+    )
+
+    plt.colorbar(sc_int, label="(log10) Interaction strength")
+    axs.set_xlabel("(log10) Mean expression of gene 1")
+    axs.set_ylabel("(log10) Mean expression of gene 2")
+    axs.set_title(f"Scatter plot of dataset parameters")
     axs.legend()
     plt.show()
+
 
 def scatter_results(result):
     '''
