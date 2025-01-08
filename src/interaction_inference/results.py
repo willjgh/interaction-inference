@@ -72,9 +72,24 @@ def scatter_parameters(dataset):
     plt.show()
 
 
-def scatter_results(result):
+def scatter_results(result, detailed=False):
     '''
-    Scatter plot gene-pair parameters, coloured by correct / false detection.
+    Produce a scatter plot of interaction detection performance.
+
+    For a simulated dataset with true parameters available produce a scatter
+    plot of the log mean expression of each gene pair when ignoring interaction
+    effects i.e. points (log(k_tx_1 / k_deg_1), log(k_tx_2 / k_deg_2)) with
+    points coloured by classification results: green and red for correct and
+    incorrect classification, or specific colours for true positives, false
+    positives, true negatives and false negatives when 'detailed' bool True. 
+
+    Args:
+        result: instance of Hypothesis, Minimization or Correlation class which
+                was used to analyse a dataset whose 'param_dataset' attribute
+                should not be None (i.e. simulated dataset)
+        detailed: bool for colour detail of scatter plot, False colours only 
+                  correct and incorrect classification whereas True colours each
+                  of True / False positive / negative results.
     '''
 
     # exit if no paramters available
@@ -86,24 +101,24 @@ def scatter_results(result):
     params_df = result.dataset.param_dataset
 
     # set figure
-    if (result.method == "hyp") or (result.method == "min"):
-        # add time plot for optimization methods
-        fig, axs = plt.subplots(1, 2, figsize=(15, 6))
-        time_data = []
-    else:
-        # only scatter plot for correlation tests
-        fig, axs = plt.subplots(1, 1, figsize=(12, 12))
+    fig, axs = plt.subplots()
 
-    # flags for legend
-    green_label_needed = True
-    red_label_needed = True
-    blue_label_needed = True
+    # set colours
+    if detailed:
+        TP_col = "green"
+        FN_col = "orange"
+        TN_col = "blue"
+        FP_col = "red"
+        error_col = "black"
+    else:
+        TP_col = "green"
+        FN_col = "red"
+        TN_col = "green"
+        FP_col = "red"
+        error_col = "black"
 
     # loop over each gene-pair
     for key, val in result.result_dict.items():
-
-        # reset label
-        label = None
 
         # true parameters
         params = params_df.loc[f'Gene-pair-{key}']
@@ -113,10 +128,6 @@ def scatter_results(result):
             interaction = True
         else:
             interaction = False
-
-        # extract time
-        if (result.method == "hyp") or (result.method == "min"):
-            time_data.append(val['time'])
 
         # decide if interaction was detected
         if result.method == "hyp":
@@ -145,69 +156,76 @@ def scatter_results(result):
 
         # set colour according to detection of interaction: data has interaction
         if interaction:
+            # True positive
             if detected == True:
-                color = "green"
-                if green_label_needed:
-                    label = "Interaction detected"
-                    green_label_needed = False
+                color = TP_col
+            # False negative
             elif detected == False:
-                color = "red"
-                if red_label_needed:
-                    label = "Interaction not detected"
-                    red_label_needed = False
+                color = FN_col
+            # Error
             else:
-                color = "blue"
-                if blue_label_needed:
-                    if (result.method == "spearman") or (result.method == "pearson"):
-                        label="Undefined"
-                    else:
-                        label="Time limit"
-                    blue_label_needed = False
+                color = error_col
 
         # set colour according to detection of interaction: data has no interaction
         else:
+            # True negative
             if detected == False:
-                color = "green"
-                if green_label_needed:
-                    label = "True negative"
-                    green_label_needed = False
+                color = TN_col
+            # False positive
             elif detected == True:
-                color = "red"
-                if red_label_needed:
-                    label = "False positive"
-                    red_label_needed = False
+                color = FP_col
+            # Error
             else:
-                color = "blue"
-                if blue_label_needed:
-                    if (result.method == "spearman") or (result.method == "pearson"):
-                        label = "Undefined"
-                    else:
-                        label="Time limit"
-                    blue_label_needed = False
+                color = error_col
 
         # plot point: (x, y) location as log-mean of genes, colour as detection
-        axs[0].scatter(
+        axs.scatter(
             x = np.log10(params['k_tx_1']) - np.log10(params['k_deg_1']),
             y = np.log10(params['k_tx_2']) - np.log10(params['k_deg_2']),
-            color = color,
-            label = label
+            color = color
         )
 
     # format parameter scatter
-    axs[0].set_xlabel("log(k_tx_1 / k_deg_1)")
-    axs[0].set_ylabel("log(k_tx_2 / k_deg_2)")
-    axs[0].set_title(f"Distribution of parameters and detection results for {result.method} method")
-    axs[0].legend()
+    axs.set_xlabel("(log10) Mean expression of gene 1")
+    axs.set_ylabel("(log10) Mean expression of gene 2")
+    axs.set_title(f"Scatter plot of dataset parameters and interaction detection")
 
-    # format time histogram
-    if (result.method == "hyp") or (result.method == "min"):
-        total_time = int(sum(time_data))
-        total_time_str = f"{total_time // 3600} h {total_time // 60} m {total_time % 60}"
-        axs[1].hist(time_data, label=f"Total time: " + total_time_str)
-        axs[1].set_xlabel("Time (s)")
-        axs[1].set_ylabel("Frequency")
-        axs[1].set_title("Optimization time")
-        axs[1].legend()
+    # legend formatting
+    if detailed:
+        handles = [
+            Line2D([0], [0], c=TP_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=FN_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=TN_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=FP_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=error_col, marker='o', linestyle=''),
+        ]
+    else:
+        handles = [
+            Line2D([0], [0], c=TP_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=FP_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=error_col, marker='o', linestyle='')
+        ]
+
+    if (result.method == "hyp" or result.method == "hyp"):
+        error_str = "Time limit"
+    else:
+        error_str = "Undefined"
+
+    if detailed:
+        labels = [
+            "True positive",
+            "False negative",
+            "True negative",
+            "False positive",
+            error_str
+        ]
+    else:
+        labels = [
+            "Correctly classified",
+            "Incorrectly classified",
+            error_str
+        ]
+    axs.legend(handles, labels)
 
     # display
     plt.show()
