@@ -81,9 +81,7 @@ def bootstrap(sample, method, plot=False, printing=False):
     '''
 
     # get sample size
-    if dataset.cells is None:
-        dataset.cells = len(sample)
-    n = dataset.cells
+    n = len(sample)
 
     # get bootstrap size: default to sample size
     if method.resamples is None:
