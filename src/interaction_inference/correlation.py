@@ -44,24 +44,24 @@ class Correlation():
 
             if self.method == "pearson":
 
-                # select individual samples
-                x1_samples = [x[0] for x in samples]
-                x2_samples = [x[1] for x in samples]
+                # separate pairs into individual samples
+                x1_sample = [x[0] for x in sample]
+                x2_sample = [x[1] for x in sample]
 
                 # test
-                pearson = scipy.stats.pearsonr(x1_samples, x2_samples)
+                pearson = scipy.stats.pearsonr(x1_sample, x2_sample)
 
                 # store result
                 solution_dict[i] = {'pvalue': float(pearson.pvalue), 'statistic': float(pearson.statistic)}
 
             elif self.method == "spearman":
 
-                # select individual samples
-                x1_samples = [x[0] for x in samples]
-                x2_samples = [x[1] for x in samples]
+                # separate pairs into individual samples
+                x1_sample = [x[0] for x in sample]
+                x2_sample = [x[1] for x in sample]
 
                 # test
-                spearman = scipy.stats.spearmanr(x1_samples, x2_samples)
+                spearman = scipy.stats.spearmanr(x1_sample, x2_sample)
 
                 # store result
                 solution_dict[i] = {'pvalue': float(spearman.pvalue), 'statistic': float(spearman.statistic)}
