@@ -8,6 +8,9 @@ Implements class to handle minmization analysis method.
 
 import tqdm
 import pandas as pd
+import numpy as np
+import gurobipy as gp
+from gurobipy import GRB
 from interaction_inference import bootstrap
 from interaction_inference import truncation
 
@@ -28,7 +31,6 @@ class Minimization():
         # analysis method settings
         self.method = "min"
         self.license_file = None
-        self.settings = None
         self.time_limit = 300
         self.silent = True
         self.K = 100
@@ -96,11 +98,11 @@ class Minimization():
         '''
 
         # if provided load WLS license credentials
-        if self.licence_file:
+        if self.license_file:
             environment_parameters = json.load(open(self.license_file))
         # otherwise use default environment (e.g Named User license)
         else:
-            environment_parameters = None
+            environment_parameters = {}
 
         # silence output
         if self.silent:

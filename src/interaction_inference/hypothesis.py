@@ -8,6 +8,9 @@ Implements class to handle hypothesis analysis method.
 
 import tqdm
 import pandas as pd
+import numpy as np
+import gurobipy as gp
+from gurobipy import GRB
 from interaction_inference import bootstrap
 from interaction_inference import truncation
 
@@ -28,7 +31,7 @@ class Hypothesis():
 
         # analysis method settings
         self.license_file = None
-        self.settings = None
+        self.constraint_settings = None
         self.time_limit = 300
         self.silent = True
         self.K = 100
@@ -94,15 +97,15 @@ class Hypothesis():
         '''
 
         # if provided load WLS license credentials
-        if self.licence_file:
+        if self.license_file:
             environment_parameters = json.load(open(self.license_file))
         # otherwise use default environment (e.g Named User license)
         else:
-            environment_parameters = None
+            environment_parameters = {}
 
         # constraint settings: default to only joint constraints
         if self.constraint_settings is None:
-            constraint_settings = {
+            self.constraint_settings = {
                 'bivariateB': True,
                 'univariateB': False,
                 'bivariateCME': True,
@@ -239,7 +242,7 @@ class Hypothesis():
                 md.addConstr(p1.sum() <= 1, name="Distribution x1")
                 md.addConstr(p2.sum() <= 1, name="Distribution x2")
 
-                if self.settings['bivariateB']:
+                if self.constraint_settings['bivariateB']:
 
                     # stationary distribution bounds: for each observed count pair
                     for x1_OB in range(min_x1_OB, max_x1_OB + 1):
@@ -250,7 +253,7 @@ class Hypothesis():
                             
                             # sum over truncation range (INCLUSIVE): drop terms with coefficients < thresh
                             sum_expr = gp.quicksum([
-                                truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) * p1[x1_OG] * p2[x2_OG]
+                                truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, dataset.beta) * p1[x1_OG] * p2[x2_OG]
                                 for x1_OG in range(min_x1_OG, max_x1_OG + 1)
                                 for x2_OG in range(min_x2_OG, max_x2_OG + 1)
                                 if truncation.B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, dataset.beta) >= dataset.thresh_OG
@@ -259,7 +262,7 @@ class Hypothesis():
                             md.addConstr(sum_expr >= bounds['joint'][0, x1_OB, x2_OB], name=f"B lb {x1_OB}, {x2_OB}")
                             md.addConstr(sum_expr <= bounds['joint'][1, x1_OB, x2_OB], name=f"B ub {x1_OB}, {x2_OB}")
                 
-                if self.settings['univariateB']:
+                if self.constraint_settings['univariateB']:
 
                     # marginal stationary distribution bounds: for each observed count
                     for x1_OB in range(minM_x1_OB, maxM_x1_OB + 1):
@@ -284,7 +287,7 @@ class Hypothesis():
                         md.addConstr(sum_expr >= bounds['x2'][0, x2_OB], name=f"B marginal lb {x2_OB}")
                         md.addConstr(sum_expr <= bounds['x2'][1, x2_OB], name=f"B marginal ub {x2_OB}")
 
-                if self.settings['bivariateCME']:
+                if self.constraint_settings['bivariateCME']:
 
                     # equate dummy joint variable to product of marginals: all original states
                     for x1_OG in range(overall_max_x1_OG + 1):
@@ -316,7 +319,7 @@ class Hypothesis():
                                 name=f"CME {x1_OG}, {x2_OG}"
                                 )
                 
-                if self.settings['univariateCME']:
+                if self.constraint_settings['univariateCME']:
 
                     # CME for x1
                     for x1_OG in range(overall_max_x1_OG):
