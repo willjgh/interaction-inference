@@ -72,7 +72,7 @@ class Dataset():
         # load json
         pass
 
-    def simulate_dataset(self, beta, gene_pairs, cells, interaction_chance=0.5, conditional=False, sig=0.5, plot=False):
+    def simulate_dataset(self, beta, gene_pairs, cells, interaction_chance=0.5, conditional=False, sig=0.5):
         '''
         Produce dataset of gene pairs' simulated parameters and samples.
 
@@ -93,7 +93,6 @@ class Dataset():
                         sampled independently (False) or conditionally (True)
             sig: standard deviation about common value for parameters of each gene
                 during conditional sampling 
-            plot: toggle plotting a scatter plot of the simulated parameters
 
         Returns:
             Nothing
@@ -180,14 +179,6 @@ class Dataset():
 
             # store counts
             counts_df.iloc[i] = sample['OB']
-
-        # plot
-        if plot:
-            plt.scatter(np.log10(params_df['k_tx_1'].astype(np.float64)) - np.log10(params_df['k_deg_1'].astype(np.float64)), np.log10(params_df['k_tx_2'].astype(np.float64)) - np.log10(params_df['k_deg_2'].astype(np.float64)))
-            plt.xlabel("log(k_tx_1 / k_deg_1)")
-            plt.ylabel("log(k_tx_2 / k_deg_2)")
-            plt.title("Scatter plot of gene-pair parameters")
-            plt.show()
 
         # store datasets
         self.count_dataset = counts_df
