@@ -8,6 +8,7 @@ Module to implement functions for analysis of performance on results on datsets.
 
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import seaborn as sns
 import numpy as np
 import math
@@ -70,7 +71,6 @@ def scatter_parameters(dataset):
     axs.set_title(f"Scatter plot of dataset parameters")
     axs.legend()
     plt.show()
-
 
 def scatter_results(result, detailed=False):
     '''
@@ -206,7 +206,7 @@ def scatter_results(result, detailed=False):
             Line2D([0], [0], c=error_col, marker='o', linestyle='')
         ]
 
-    if (result.method == "hyp" or result.method == "hyp"):
+    if (result.method == "hyp" or result.method == "min"):
         error_str = "Time limit"
     else:
         error_str = "Undefined"
@@ -229,6 +229,33 @@ def scatter_results(result, detailed=False):
 
     # display
     plt.show()
+
+def time_histogram(result):
+    '''
+    Display histogram of optimization time per sample when analysing dataset.
+    '''
+
+    # check time present
+    if not (result.method == "hyp" or result.method == "min"):
+        print("No time information available")
+        return None
+
+    # extract time data
+    time_data = []
+    for val in result.result_dict.values():
+        time_data.append(val['time'])
+
+    # get total time
+    total_time = int(sum(time_data))
+    total_time_str = f"{total_time // 3600} h {total_time // 60} m {total_time % 60}"
+    
+    # time histogram
+    fig, axs = plt.subplots()
+    axs.hist(time_data, label="Total time: " + total_time_str)
+    axs.set_xlabel("Optimizaton time (s)")
+    axs.set_ylabel("Frequency")
+    axs.set_title("Histogram of optimization time per gene pair")
+    axs.legend()
 
 # ------------------------------------------------
 # Classification Functions
