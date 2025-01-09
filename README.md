@@ -6,16 +6,12 @@ For current research on the method applied to interaction detection see the repo
 
 ## Installation
 
-Package will hopefully soon be available on PyPi and installable through the python package manager pip
+Package is available on PyPi and installable through pip via
 
 ```
 pip install interaction-inference
 ```
 
-## Examples
+## Background and Examples
 
-For a brief overiew and example usage of the package see the notebook in the [examples folder](examples/example_notebook.ipynb), which shows how to load or simulate datasets, run analysis methods and compute performance metrics on example data.
-
-## Background
-
-Detailed explanations of the optimization approach and interaction problem are available through the links above, but I provide a simple explanation of the background.
+For a brief overiew of biological background and example usage of the package see the [example notebook](examples/example_notebook.ipynb), which shows how to load and simulate datasets, run analysis methods and compute performance metrics on simulated data.
