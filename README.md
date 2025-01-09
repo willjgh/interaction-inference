@@ -14,4 +14,4 @@ pip install interaction-inference
 
 ## Background and Examples
 
-For a brief overiew of biological background and example usage of the package see the [example notebook](examples/example_notebook.ipynb), which shows how to load and simulate datasets, run analysis methods and compute performance metrics on simulated data.
+For a brief overiew of biological background and example usage of the package see the [example notebook](https://github.com/willjgh/interaction-inference/blob/main/examples/example_notebook.ipynb), which shows how to load and simulate datasets, run analysis methods and compute performance metrics on simulated data.
