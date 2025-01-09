@@ -1,5 +1,5 @@
 '''
-Implements class to handle hypothesis analysis method.
+Module implementing class to handle hypothesis inference method.
 '''
 
 # ------------------------------------------------

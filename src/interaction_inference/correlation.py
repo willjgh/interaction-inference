@@ -1,5 +1,5 @@
 '''
-Implements class to handle correlation analysis method.
+Module implementing class to handle correlation test inference method.
 '''
 
 # ------------------------------------------------

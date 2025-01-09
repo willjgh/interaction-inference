@@ -1,5 +1,5 @@
 '''
-Implements class to handle minmization analysis method.
+Module implementing class to handle minimization inference method.
 '''
 
 # ------------------------------------------------

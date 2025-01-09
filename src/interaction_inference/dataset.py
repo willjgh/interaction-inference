@@ -1,5 +1,5 @@
 '''
-Module implementing class to contain dataset settings.
+Module implementing class to handle datasets and related settings.
 '''
 
 # ------------------------------------------------
@@ -13,7 +13,7 @@ import tqdm
 import matplotlib.pyplot as plt
 
 # ------------------------------------------------
-# Dataset settings class
+# Dataset class
 # ------------------------------------------------
 
 class Dataset():
@@ -59,18 +59,6 @@ class Dataset():
         if param_dataset_filename:
             # parameter dataset only available for simulated data
             self.param_dataset.to_csv(param_dataset_filename)
-
-    def pre_compute_truncation(self, size):
-        # call compute truncation
-        pass
-
-    def store_truncation(self):
-        # store as json
-        pass
-
-    def load_truncation(self):
-        # load json
-        pass
 
     def simulate_dataset(self, beta, gene_pairs, cells, interaction_chance=0.5, conditional=True, sig=0.5):
         '''
