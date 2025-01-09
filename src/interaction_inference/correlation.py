@@ -9,6 +9,7 @@ Implements class to handle correlation analysis method.
 import scipy
 import tqdm
 import pandas as pd
+from ast import literal_eval
 
 # ------------------------------------------------
 # Hypothesis class
@@ -41,6 +42,10 @@ class Correlation():
 
             # select sample
             sample = list(dataset.count_dataset.loc[f'Gene-pair-{i}'])
+
+            # convert string to tuple if neccessary (pandas reading csv to string)
+            if type(sample[0]) == str:
+                sample = [literal_eval(count_pair) for count_pair in sample]
 
             if self.method == "pearson":
 

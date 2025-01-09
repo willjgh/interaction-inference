@@ -23,6 +23,7 @@ bounds = bootstrap(rng, sample, splits=10)
 
 import numpy as np
 import matplotlib.pyplot as plt
+from ast import literal_eval
 
 # ------------------------------------------------
 # Functions
@@ -90,6 +91,10 @@ def bootstrap(sample, method, plot=False, printing=False):
 
     # initialize random generator
     rng = np.random.default_rng()
+
+    # convert string to tuple if neccessary (pandas reading csv to string)
+    if type(sample[0]) == str:
+        sample = [literal_eval(count_pair) for count_pair in sample]
 
     # compute maximum x1 and x2 values
     M, N = np.max(sample, axis=0)
