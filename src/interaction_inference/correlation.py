@@ -16,11 +16,12 @@ from ast import literal_eval
 # ------------------------------------------------
 
 class Correlation():
-    def __init__(self, method="pearson"):
+    def __init__(self, method="pearson", alternative="less"):
         '''Initialize analysis settings and result storage.'''
 
         # analysis method settings
         self.method = method
+        self.alternative = alternative
 
         # dataset used
         self.dataset = None
@@ -54,7 +55,7 @@ class Correlation():
                 x2_sample = [x[1] for x in sample]
 
                 # test
-                pearson = scipy.stats.pearsonr(x1_sample, x2_sample)
+                pearson = scipy.stats.pearsonr(x1_sample, x2_sample, alternative=self.alternative)
 
                 # store result
                 solution_dict[i] = {'pvalue': float(pearson.pvalue), 'statistic': float(pearson.statistic)}
@@ -66,7 +67,7 @@ class Correlation():
                 x2_sample = [x[1] for x in sample]
 
                 # test
-                spearman = scipy.stats.spearmanr(x1_sample, x2_sample)
+                spearman = scipy.stats.spearmanr(x1_sample, x2_sample, alternative=self.alternative)
 
                 # store result
                 solution_dict[i] = {'pvalue': float(spearman.pvalue), 'statistic': float(spearman.statistic)}

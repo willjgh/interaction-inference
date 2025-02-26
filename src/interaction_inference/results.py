@@ -72,6 +72,178 @@ def scatter_parameters(dataset):
     axs.legend()
     plt.show()
 
+def multi_scatter_results(*result_tuple, detailed=False):
+    '''
+    Produce a scatter plot of interaction detection performance.
+
+    For a simulated dataset with true parameters available produce a scatter
+    plot of the log mean expression of each gene pair when ignoring interaction
+    effects i.e. points (log(k_tx_1 / k_deg_1), log(k_tx_2 / k_deg_2)) with
+    points coloured by classification results: green and red for correct and
+    incorrect classification, or specific colours for true positives, false
+    positives, true negatives and false negatives when 'detailed' bool True. 
+
+    Args:
+        result_tuple: instance(s) of Hypothesis, Minimization or Correlation class which
+                was used to analyse a dataset whose 'param_dataset' attribute
+                should not be None (i.e. simulated dataset)
+        detailed: bool for colour detail of scatter plot, False colours only 
+                  correct and incorrect classification whereas True colours each
+                  of True / False positive / negative results.
+    '''
+
+    # set figure
+    fig, axs = plt.subplots()
+
+    # set colours
+    if detailed:
+        TP_col = "green"
+        FN_col = "orange"
+        TN_col = "blue"
+        FP_col = "red"
+        error_col = "black"
+    else:
+        TP_col = "green"
+        FN_col = "red"
+        TN_col = "green"
+        FP_col = "red"
+        error_col = "black"
+
+    # check results all of same method
+    for i, result in enumerate(result_tuple):
+        # get first method
+        if i == 0:
+            method = result.method
+        # otherwise check same
+        else:
+            if not (method == result.method):
+                print("Multiple method types provided")
+                return None
+
+    # loop over each result object
+    for result in result_tuple:
+
+        # exit if no paramters available
+        if result.dataset.param_dataset is None:
+            print("No parameter dataset available")
+            return None
+
+        # get parameter dataset
+        params_df = result.dataset.param_dataset
+
+        # loop over each gene-pair
+        for key, val in result.result_dict.items():
+
+            # true parameters
+            params = params_df.loc[f'Gene-pair-{key}']
+
+            # set true status of interaction
+            if params['k_reg'] > 0:
+                interaction = True
+            else:
+                interaction = False
+
+            # decide if interaction was detected
+            if result.method == "hyp":
+                if val['status'] == 'INFEASIBLE':
+                    detected = True
+                elif val['status'] == 'OPTIMAL':
+                    detected = False
+                else:
+                    detected = None
+            elif result.method == "min":
+                if val['status'] == 'USER_OBJ_LIMIT':
+                    detected = True
+                elif (val['status'] == 'OPTIMAL') and (val['bound'] > 0.0001) and (val['bound'] < np.inf):
+                    detected = True
+                elif val['status'] == 'OPTIMAL':
+                    detected = False
+                else:
+                    detected = None
+            elif (result.method == "pearson") or (result.method == "spearman"):
+                if val['pvalue'] < 0.05:
+                    detected = True
+                elif val['pvalue'] >= 0.05:
+                    detected = False
+                else:
+                    detected = None
+
+            # set colour according to detection of interaction: data has interaction
+            if interaction:
+                # True positive
+                if detected == True:
+                    color = TP_col
+                # False negative
+                elif detected == False:
+                    color = FN_col
+                # Error
+                else:
+                    color = error_col
+
+            # set colour according to detection of interaction: data has no interaction
+            else:
+                # True negative
+                if detected == False:
+                    color = TN_col
+                # False positive
+                elif detected == True:
+                    color = FP_col
+                # Error
+                else:
+                    color = error_col
+
+            # plot point: (x, y) location as log-mean of genes, colour as detection
+            axs.scatter(
+                x = np.log10(params['k_tx_1']) - np.log10(params['k_deg_1']),
+                y = np.log10(params['k_tx_2']) - np.log10(params['k_deg_2']),
+                color = color
+            )
+
+    # format parameter scatter
+    axs.set_xlabel("(log10) Mean expression of gene 1")
+    axs.set_ylabel("(log10) Mean expression of gene 2")
+    axs.set_title(f"Scatter plot of dataset parameters and interaction detection")
+
+    # legend formatting
+    if detailed:
+        handles = [
+            Line2D([0], [0], c=TP_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=FN_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=TN_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=FP_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=error_col, marker='o', linestyle=''),
+        ]
+    else:
+        handles = [
+            Line2D([0], [0], c=TP_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=FP_col, marker='o', linestyle=''),
+            Line2D([0], [0], c=error_col, marker='o', linestyle='')
+        ]
+
+    if (result.method == "hyp" or result.method == "min"):
+        error_str = "Time limit"
+    else:
+        error_str = "Undefined"
+
+    if detailed:
+        labels = [
+            "True positive",
+            "False negative",
+            "True negative",
+            "False positive",
+            error_str
+        ]
+    else:
+        labels = [
+            "Correctly classified",
+            "Incorrectly classified",
+            error_str
+        ]
+    axs.legend(handles, labels)
+
+    # display
+    plt.show()
+
 def scatter_results(result, detailed=False):
     '''
     Produce a scatter plot of interaction detection performance.

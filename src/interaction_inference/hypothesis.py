@@ -6,6 +6,7 @@ Module implementing class to handle hypothesis inference method.
 # Dependencies
 # ------------------------------------------------
 
+import json
 import tqdm
 import pandas as pd
 import numpy as np
