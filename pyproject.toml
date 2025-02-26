@@ -22,10 +22,10 @@ classifiers = [
 
 requires-python = ">=3.8"
 dependencies = [
-    "numpy<2",
+    "numpy",
     "scipy",
     "matplotlib",
-    "gurobipy==11.0",
+    "gurobipy==12.0.1",
     "pandas",
     "tqdm",
     "seaborn",
