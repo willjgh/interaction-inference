@@ -6,19 +6,22 @@ Module implementing class to handle datasets and related settings.
 # Dependencies
 # ------------------------------------------------
 
-from interaction_inference import simulation
+from interaction_inference import bootstrap
+from interaction_inference import truncation
 import pandas as pd
 import numpy as np
 import tqdm
-import matplotlib.pyplot as plt
 
 # ------------------------------------------------
 # Dataset class
 # ------------------------------------------------
 
 class Dataset():
-    def __init__(self):
+    def __init__(self, name):
         '''Initialise dataset settings'''
+
+        # name
+        self.name = name
 
         # dataset iteself
         self.count_dataset = None
@@ -31,16 +34,27 @@ class Dataset():
         # capture efficiency
         self.beta = None
 
-        # simulation settings
-        self.interaction = None
-        self.conditional = None
-        self.sig = None
-
+        # bootstrap settings
+        self.resamples = None
+        self.splits = 1
+        self.thresh_OB = 10
+        self.threshM_OB = 10
+        
         # truncation settings
         self.thresh_OG = 10**-6
-        self.threshM_OG = 10**-6
-        self.truncations = {}
-        self.truncationsM = {}
+
+        # truncation info
+        self.truncation_OB = None
+        self.truncationM_OB = None
+        self.truncation_OG = None
+        self.extent_OG = None
+
+        # moment bounds
+        self.moments_OB = None
+
+        # probability bounds
+        self.probs_OB = None
+
 
     def load_dataset(self, count_dataset_filename, beta=None, param_dataset_filename=None):
         '''Load dataset from csv files: paramter and count data'''
@@ -53,6 +67,7 @@ class Dataset():
         self.gene_pairs, self.cells = self.count_dataset.shape
         self.beta = beta
 
+
     def store_dataset(self, count_dataset_filename, param_dataset_filename=None):
         '''Store dataset as csv files: parameter and count data'''
         self.count_dataset.to_csv(count_dataset_filename)
@@ -60,123 +75,181 @@ class Dataset():
             # parameter dataset only available for simulated data
             self.param_dataset.to_csv(param_dataset_filename)
 
-    def simulate_dataset(self, beta, gene_pairs, cells, interaction_chance=0.5, conditional=True, sig=0.5):
+
+    def downsample(self, name, beta):
         '''
-        Produce dataset of gene pairs' simulated parameters and samples.
-
-        Produce a dataset of pairs of genes where for each pair parameters of a
-        birth-death regulation model are simulated, and then a sample of size
-        'cells' is simulated from the model. Parameters are sampled from log-uniform 
-        distributions informed by single cell RNA sequencing experiments to produce
-        realistic data. The paramters and samples are returned in a dictionary of 2
-        pandas dataframes.
-
-        Args:
-            beta: per cell capture efficiency vector / single value
-            gene_pairs: number of gene pairs to simulate
-            cells: number of samples to simulate per gene pair
-            interaction_chance: float in [0, 1], chance the interation parameter
-                                'k_reg' is sampled vs being set to 0 (no interaction)
-            conditional: toggle if model parameters for each gene in the pair are
-                        sampled independently (False) or conditionally (True)
-            sig: standard deviation about common value for parameters of each gene
-                during conditional sampling 
-
-        Returns:
-            Nothing
-
-            Sets attributes self.count_dataset and self.param_dataset to
-            pandas dataframes of counts simulated per cell per gene-pair and
-            model parameters simulated per gene-pair. Sets attributes with 
-            simulation settings provided as arguments.
+        Apply a beta capture efficiency to the dataset, returning a copy with
+        binomially downsampled counts and corresponding beta stored.
         '''
 
+        # fail if dataset already downsampled
+        if not (self.beta == np.array([1.0 for j in range(self.cells)])):
+            print("Dataset has already been downsampled")
+            return None
+
+        # fail if incomptible cell numbers
+        if not (beta.shape[0] == self.cells):
+            print("Incompatible cell numbers.")
+            return None
+        
         # initialize random generator
         rng = np.random.default_rng()
 
-        # dataframes
-        params_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=['k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
-        counts_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=[f"Cell-{j}" for j in range(cells)])
+        # setup downsampled dataset
+        downsampled_counts_df = pd.DataFrame(
+            index=[f"Gene-pair-{i}" for i in range(self.gene_pairs)],
+            columns=[f"Cell-{j}" for j in range(self.cells)]
+        )
 
-        # for each gene
-        for i in tqdm.tqdm(range(gene_pairs)):
+        # for each sample
+        for i in range(self.gene_pairs):
 
-            # Select if interation or not
-            u = rng.uniform()
-            if u < interaction_chance:
-                interaction = True
-            else:
-                interaction = False
+            # extract counts
+            sample = self.counts_df.iloc[i]
+            x1_sample = [x[0] for x in sample]
+            x2_sample = [x[1] for x in sample]
 
-            # Simulate reaction rate parameters 
+            # downsample
+            x1_sample_downsampled = rng.binomial(x1_sample, beta).tolist()
+            x2_sample_downsampled = rng.binomial(x2_sample, beta).tolist()
+            sample_downsampled = list(zip(x1_sample_downsampled, x2_sample_downsampled))
+            
+            # store counts
+            downsampled_counts_df.iloc[i] = sample_downsampled
 
-            # conditional sampling
-            if conditional:
+        # create new downsampled dataset object
+        downsampled_dataset = Dataset(name)
 
-                # sample log-mean capture efficiency
-                log_mean = rng.uniform(-0.5, 1.5)
+        # store counts
+        downsampled_dataset.count_dataset = downsampled_counts_df
 
-                # sample from normal distribution about the log-mean
-                log_mean_1 = rng.normal(log_mean, sig)
-                log_mean_2 = rng.normal(log_mean, sig)
+        # store capture
+        downsampled_dataset.beta = beta
 
-                # sample degradation rates for each gene
-                log_k_deg_1 = rng.uniform(-1, 0)
-                log_k_deg_2 = rng.uniform(-1, 0)
+        # copy over information
+        downsampled_dataset.param_dataset = self.param_dataset
+        downsampled_dataset.cells = self.cells
+        downsampled_dataset.gene_pairs = self.gene_pairs
 
-                # compute transcription rates using log-mean and deg rate
-                log_k_tx_beta_1 = log_mean_1 + log_k_deg_1
-                log_k_tx_beta_2 = log_mean_2 + log_k_deg_2
+        return downsampled_dataset
 
-                # sample interaction strength
-                if interaction: log_k_reg = rng.uniform(-1, 1)
+    
+    def bootstrap_moments(self, tqdm_disable=True):
+        '''
+        For each over samples in dataset compute bootstrap CI bounds on moments
+        and compute original truncation information, storing this in attributes
+        of the dataset.
+        '''
 
-            # independent sampling
-            else:
+        # collect moment bounds
+        moment_dict = {}
 
-                # sample rates from log-uniform distribution for both genes
-                log_k_tx_beta_1 = rng.uniform(-1, 1.5)
-                log_k_tx_beta_2 = rng.uniform(-1, 1.5)
-                log_k_deg_1 = rng.uniform(-1, 0)
-                log_k_deg_2 = rng.uniform(-1, 0)
-                if interaction: log_k_reg = rng.uniform(-2, 2)
+        # loop over samples
+        for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
 
-            # exponentiate and scale
-            k_tx_1 = (10 ** log_k_tx_beta_1) / np.mean(beta)
-            k_tx_2 = (10 ** log_k_tx_beta_2) / np.mean(beta)
-            k_deg_1 = 10 ** log_k_deg_1
-            k_deg_2 = 10 ** log_k_deg_2
-            if interaction:
-                k_reg = 10 ** log_k_reg
-            else:
-                k_reg = 0
+            # select sample
+            sample = list(self.count_dataset.loc[f'Gene-pair-{i}'])
 
-            # store parameters
-            params_df.iloc[i] = [k_tx_1, k_tx_2, k_deg_1, k_deg_2, k_reg]
+            # bootstrap moments
+            moment_results = bootstrap.bootstrap_moments(
+                sample,
+                self.beta,
+                self.resamples
+            )
 
-            params = {
-                'k_tx_1': k_tx_1,
-                'k_tx_2': k_tx_2,
-                'k_deg_1': k_deg_1,
-                'k_deg_2': k_deg_2,
-                'k_reg': k_reg
+            # store moments
+            moment_dict[f'sample-{i}'] = moment_results
+
+        # store information
+        self.moments_OB = moment_dict
+
+
+    def bootstrap_probabilities(self, tqdm_disable=True):
+        '''
+        For each over samples in dataset compute bootstrap CI bounds on joint and
+        marginal probabilities as well as observed truncation information,
+        storing this in attributes of the dataset.
+
+        NOTE: currently both saves CI bounds arrays to file AND stores as attribute
+        '''
+
+        # collect OB truncations
+        truncation_dict = {}
+        truncationM_dict = {}
+
+        # collect CI bounds
+        probs_dict = {}
+
+        # loop over samples
+        for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
+
+            # select sample
+            sample = list(self.count_dataset.loc[f'Gene-pair-{i}'])
+
+            # bootstrap probabilities
+            prob_results = bootstrap.bootstrap_probabilities(
+                sample,
+                self.resamples,
+                self.splits,
+                self.thresh_OB,
+                self.threshM_OB
+            )
+
+            # store OB truncation
+            truncation_dict[f'sample-{i}'] = prob_results['truncation_OB']
+            truncationM_dict[f'sample-{i}'] = prob_results['truncationM_OB']
+
+            # store CI bounds
+            probs_dict[f'sample-{i}'] = {
+                'bounds': prob_results['bounds'],
+                'x1_bounds': prob_results['x1_bounds'],
+                'x2_bounds': prob_results['x2_bounds']
             }
 
-            # simulate sample from model
-            sample = simulation.gillespie(params, cells, beta)
+            # OR:
+            # save CI bounds
+            np.save(
+                f"./Temp/{self.name}/Bounds/Joint/sample-{i}.npy",
+                prob_results['bounds']
+            )
+            np.save(
+                f"./Temp/{self.name}/Bounds/x1_marginal/sample-{i}.npy",
+                prob_results['x1_bounds']
+            )
+            np.save(
+                f"./Temp/{self.name}/Bounds/x2_marginal/sample-{i}.npy",
+                prob_results['x2_bounds']
+            )
 
-            # store counts
-            counts_df.iloc[i] = sample['OB']
+        # store information
+        self.truncation_OB = truncation_dict
+        self.truncationM_OB = truncationM_dict
+        self.probs_OB = probs_dict
 
-        # store datasets
-        self.count_dataset = counts_df
-        self.param_dataset = params_df
+    def probability_setup(self, display=False, tqdm_disable=True):
+        '''
+        Additional setup needed for probability constraints.
+        '''
 
-        # store simulation settings
-        self.beta = beta
-        self.gene_pairs = gene_pairs
-        self.cells = cells
-        self.interaction = interaction
-        self.conditional = conditional
-        if conditional:
-            self.sig = sig
+        # bootstrap probabilities
+        self.bootstrap_probabilities(tqdm_disable=tqdm_disable)
+
+        # display OB truncations
+        if display:
+            truncation.illustrate_truncation(self.truncation_OB, self.truncationM_OB)
+
+        # summarise observed truncations
+        truncation_summary = truncation.summarise_truncation(self.truncation_OB, self.truncationM_OB)
+
+        # compute original truncation
+        truncation_OG = truncation.original_truncation(truncation_summary, self.beta, self.thresh_OG, tqdm_disable=tqdm_disable)
+
+        # compute and store B and Bm coefficients
+        truncation.compute_coefficients(truncation_summary, truncation_OG, self.beta, self.name, self.thresh_OG, tqdm_disable=tqdm_disable)
+
+        # compute original extent
+        extent_OG = truncation.compute_original_extent(self.truncation_OB, self.truncationM_OB, truncation_OG)
+
+        # store information
+        self.truncation_OG = truncation_OG
+        self.extent_OG = extent_OG
