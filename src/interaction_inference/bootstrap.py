@@ -23,31 +23,126 @@ import matplotlib.pyplot as plt
 from ast import literal_eval
 
 # ------------------------------------------------
-# Functions
+# Bootstrap moments
 # ------------------------------------------------
 
-def bootstrap(sample, method, plot=False, printing=False):
+def bootstrap_moments(sample, beta, resamples=None):
+    '''
+    Compute confidence intervals on the moments of a sample of count pairs.
+
+    Compute confidence intervals for the moments: mean, variance, cross moments,
+    etc of the sample using the percentile bootstrap.
+
+    Args:
+        sample: list of tuples (x1, x2) of integer counts per cell
+        beta: capture efficiency vector
+        resamples: integer number of bootstrap resamples to use
+
+    Returns:
+        A dictionary containing results
+
+        Confidence intervals:
+
+        'E_x1': CI bounds on E[X1]
+        'E_x2': CI bounds on E[X2]
+        'E_x1_x2': CI ounds on E[X1X2]
+
+        Truncation information:
+
+        'max_x1_OG', 'max_x2_OG': marginal truncation extent
+    '''
+
+    # get sample size
+    n = len(sample)
+
+    # get bootstrap size: default to sample size
+    if resamples is None:
+        resamples = n
+
+    # initialize random generator
+    rng = np.random.default_rng()
+
+    # convert string to tuple if neccessary (pandas reading csv to string)
+    if type(sample[0]) == str:
+        sample = [literal_eval(count_pair) for count_pair in sample]
+
+    # separate sample pairs
+    x1_sample = [x[0] for x in sample]
+    x2_sample = [x[1] for x in sample]
+
+    # convert sample to n x 2 array
+    sample = np.array([x1_sample, x2_sample]).T
+
+    # bootstrap to resamples x n x 2 array
+    boot = rng.choice(sample, size=(resamples, n))
+
+    # mean over axis 1 to get E[X1], E[X2] for each resample
+    means = np.mean(boot, axis=1)
+
+    # product over axis 2 to get x1x2 counts
+    prods = np.prod(boot, axis=2)
+
+    # mean over axis 1 to get E[X1X2] for each resample
+    prod_means = np.mean(prods, axis=1)
+
+    # square to get x1**2 and x2**2 counts
+    squares = boot**2
+
+    # mean over axis 1 to get E[X1**2], E[X2**2] for each resample
+    square_means = np.mean(squares, axis=1)
+    
+    # quantiles over resamples
+    mean_bounds = np.quantile(means, [0.025, 0.975], axis=0)
+    prod_mean_bounds = np.quantile(prod_means, [0.025, 0.975], axis=0)
+    square_mean_bounds = np.quantile(square_means, [0.025, 0.975], axis=0)
+
+    # collect information
+    result_dict = {
+        'E_x1': mean_bounds[:, 0],
+        'E_x2': mean_bounds[:, 1],
+        'E_x1_x2': prod_mean_bounds,
+        'E_x1_sq': square_mean_bounds[:, 0],
+        'E_x2_sq': square_mean_bounds[:, 1]
+    }
+
+    # truncation information
+
+    # compute maximum x1 and x2 values
+    max_x1_OB = int(np.max(x1_sample))
+    max_x2_OB = int(np.max(x2_sample))
+
+    # mean capture efficiency
+    E_beta = np.mean(beta)
+
+    # scale by mean capture to get max OG values
+    result_dict['max_x1_OG'] = int(max_x1_OB / E_beta) + 1
+    result_dict['max_x2_OG'] = int(max_x2_OB / E_beta) + 1
+
+    return result_dict
+
+# ------------------------------------------------
+# Bootstrap probabilities
+# ------------------------------------------------
+
+def bootstrap_probabilities(sample, resamples=None, splits=1, thresh_OB=10, threshM_OB=10, plot=False, printing=False):
     '''
     Compute confidence intervals on the distribution of a sample of count pairs.
 
     Compute confidence intervals for the joint and marginal probabilities of the 
-    sample using the percentile bootstrap and settings specified in the method
-    object. Compute a state space truncation using a given threshold on the
-    number of samples per interval, replacing intervals on probabilities of
-    states outside the truncation by [0, 1] to improve coverage.
+    sample using the percentile bootstrap and settings specified. Compute a state
+    space truncation using a given threshold on the number of samples per interval,
+    replacing intervals on probabilities of states outside the truncation by [0, 1]
+    to improve coverage.
 
     Args:
         sample: list of tuples (x1, x2) of integer counts per cell
-        method: instance of Hypothesis or Minimization class with settings
-                stored as attributes
-
-                .resamples: integer number of bootstrap resamples to use
-                .splits: integer number of times to 'split' resampling across
-                         multiple arrays to avoid memory issues
-                .thresh_OB: threshold on observation frequency of a state pair
-                            for state space truncation
-                .threshM_OB: threshold on observation frequency on a state for
-                             marginal state space truncation
+        resamples: integer number of bootstrap resamples to use
+        splits: integer number of times to 'split' resampling across
+                multiple arrays to avoid memory issues
+        thresh_OB: threshold on observation frequency of a state pair
+                   for state space truncation
+        threshM_OB: threshold on observation frequency on a state for
+                    marginal state space truncation
         
         plot: toggle plotting of confidence intervals and estimates
         print: toggle printing of observed state space truncation
@@ -55,36 +150,30 @@ def bootstrap(sample, method, plot=False, printing=False):
     Returns:
         A dictionary containing results
 
-        Sample information:
-
-        'sample': original sample used
-        'sample_counts': occurances of each state pair in the original sample
-        'sample_counts_x1': occurances of each state in the original sample (gene 1)
-        'sample_counts_x2': occurances of each state in the original sample (gene 2)
-
         Confidence intervals:
     
-        'joint': (2, _, _) numpy array of CI bounds on joint distribution
-        'x1': (2, _) numpy array of CI bounds on marginal distribution (gene 1)
-        'x2': (2, _) numpy array of CI bounds on marginal distribution (gene 2)
+        'bounds': (2, _, _) numpy array of CI bounds on joint distribution
+        'x1_bounds': (2, _) numpy array of CI bounds on marginal distribution (gene 1)
+        'x2_bounds': (2, _) numpy array of CI bounds on marginal distribution (gene 2)
 
-        Truncation information
+        Truncation information:
+
+        truncation_OB:
 
         'min_x1_OB', 'max_x1_OB', 'min_x2_OB', 'max_x2_OB': joint truncation
+
+        truncationM_OB:
+
         'minM_x1_OB', 'maxM_x1_OB': marginal truncation (gene 1)
         'minM_x2_OB', 'maxM_x2_OB': marginal truncation (gene 2)
-        'thresh_flag': bool if joint state space was truncated
-        'thresh_flag_x1': bool if marginal state space was truncated (gene 1)
-        'thresh_flag_x2': bool if marginal state space was truncated (gene 2)
     '''
 
     # get sample size
     n = len(sample)
 
     # get bootstrap size: default to sample size
-    if method.resamples is None:
-        method.resamples = n
-    resamples = method.resamples
+    if resamples is None:
+        resamples = n
 
     # initialize random generator
     rng = np.random.default_rng()
@@ -104,13 +193,13 @@ def bootstrap(sample, method, plot=False, printing=False):
     D = (M + 1)*(N + 1) - 1
 
     # number of bootstrap samples per split (split to reduce memory usage)
-    resamples_split = resamples // method.splits
+    resamples_split = resamples // splits
 
     # setup count array
-    counts = np.empty((method.resamples, M + 1, N + 1), dtype='uint32')
+    counts = np.empty((resamples, M + 1, N + 1), dtype='uint32')
 
     # BS bootstrap samples: split into 'splits' number of BS_split x n arrays
-    for split in range(method.splits):
+    for split in range(splits):
 
         # BS_split bootstrap samples as BS_split x n array
         bootstrap_split = rng.choice(integer_sample, size=(resamples_split, n))
@@ -159,7 +248,7 @@ def bootstrap(sample, method, plot=False, printing=False):
     for x1 in range(M + 1):
         for x2 in range(N + 1):
             # below: replace
-            if sample_counts[x1, x2] < method.thresh_OB:
+            if sample_counts[x1, x2] < thresh_OB:
                 bounds[:, x1, x2] = [0.0, 1.0]
             # above: update truncation
             else:
@@ -180,7 +269,7 @@ def bootstrap(sample, method, plot=False, printing=False):
 
     for x1 in range(M + 1):
         # below: replace
-        if x1_sample_counts[x1] < method.threshM_OB:
+        if x1_sample_counts[x1] < threshM_OB:
             x1_bounds[:, x1] = [0.0, 1.0]
         # above: update truncation
         else:
@@ -195,7 +284,7 @@ def bootstrap(sample, method, plot=False, printing=False):
 
     for x2 in range(N + 1):
         # below: replace
-        if x2_sample_counts[x2] < method.threshM_OB:
+        if x2_sample_counts[x2] < threshM_OB:
             x2_bounds[:, x2] = [0.0, 1.0]
         # above: update truncation
         else:
@@ -274,25 +363,25 @@ def bootstrap(sample, method, plot=False, printing=False):
         print(f"Marginal x2 truncation: [{minM_x2_OB}, {maxM_x2_OB}]")
 
     # collect results
-    bounds_dict =  {
-        'sample': sample,
-        'sample_counts': sample_counts,
-        'sample_counts_x1': x1_sample_counts,
-        'sample_counts_x2': x2_sample_counts,
-        'joint': bounds,
-        'x1': x1_bounds,
-        'x2': x2_bounds,
+    truncation_OB = {
         'min_x1_OB': min_x1_OB,
         'max_x1_OB': max_x1_OB,
         'min_x2_OB': min_x2_OB,
-        'max_x2_OB': max_x2_OB,
+        'max_x2_OB': max_x2_OB
+    }
+    truncationM_OB = {
         'minM_x1_OB': minM_x1_OB,
         'maxM_x1_OB': maxM_x1_OB,
         'minM_x2_OB': minM_x2_OB,
-        'maxM_x2_OB': maxM_x2_OB,
-        'thresh_flag': thresh_flag,
-        'thresh_flag_x1': thresh_flag_x1,
-        'thresh_flag_x2': thresh_flag_x2
+        'maxM_x2_OB': maxM_x2_OB
     }
 
-    return bounds_dict
+    result_dict = {
+        'bounds': bounds,
+        'x1_bounds': x1_bounds,
+        'x2_bounds': x2_bounds,
+        'truncation_OB': truncation_OB,
+        'truncationM_OB': truncationM_OB
+    }
+
+    return result_dict
