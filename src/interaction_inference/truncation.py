@@ -1,21 +1,6 @@
 '''
-Module to compute state space truncations for use in optimization constraints.
-
-Given a coefficient threshold and per cell capture efficiency vector compute
-a dictionary of truncations. Should be computed once per dataset and passed as
-a dictionary to optimization or stored as a json file for later use.
-
-Typical example:
-
-# set capture efficiency and threshold
-beta = 0.5
-thresh = 10**-6
-
-# compute 20 x 20 grid of joint truncations
-truncations = compute_truncation(20, beta, thresh)
-
-# compute 20 marginal truncations
-truncationsM = compute_truncationM(20, beta, thresh)
+Module to compute state space truncations and coefficients for use
+when constructing probability optimization constraints.
 '''
 
 # ------------------------------------------------
@@ -23,176 +8,241 @@ truncationsM = compute_truncationM(20, beta, thresh)
 # ------------------------------------------------
 
 import numpy as np
+import matplotlib.pyplot as plt
 import scipy
-import json
 import tqdm
 
 # ------------------------------------------------
-# Functions
+# Display observed truncation
 # ------------------------------------------------
 
-def B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta):
-    '''Compute (1 / n) sum j = 1 to n of P(X1_OB, X2_OB | X1_OG, X2_OG, beta_j): product of binomial pmfs.'''
-    
-    return scipy.stats.binom.pmf(x1_OB, x1_OG, beta) * scipy.stats.binom.pmf(x2_OB, x2_OG, beta)
+def illustrate_truncation(truncation_OB, truncationM_OB):
+    rng = np.random.default_rng()
+    fig, axs = plt.subplots(1, 2, figsize=(6, 3))
+    for i, truncation in truncation_OB.items():
+        colour = list(rng.integers(0, 256, size=3))
+        axs[0].hlines([truncation['min_x1_OB'] - 0.5, truncation['max_x1_OB'] + 0.5], xmin=truncation['min_x2_OB'] - 0.5, xmax=truncation['max_x2_OB'] + 0.5, color=[colour, colour], linewidth=2)
+        axs[0].vlines([truncation['min_x2_OB'] - 0.5, truncation['max_x2_OB'] + 0.5], ymin=truncation['min_x1_OB'] - 0.5, ymax=truncation['max_x1_OB'] + 0.5, color=[colour, colour], linewidth=2)
+        axs[0].set_title("OB truncation")
+    for i, truncation in truncationM_OB.items():
+        colour = list(rng.integers(0, 256, size=3))
+        axs[1].hlines([truncation['minM_x1_OB'] - 0.5, truncation['maxM_x1_OB'] + 0.5], xmin=truncation['minM_x2_OB'] - 0.5, xmax=truncation['maxM_x2_OB'] + 0.5, color=[colour, colour], linewidth=2)
+        axs[1].vlines([truncation['minM_x2_OB'] - 0.5, truncation['maxM_x2_OB'] + 0.5], ymin=truncation['minM_x1_OB'] - 0.5, ymax=truncation['maxM_x1_OB'] + 0.5, color=[colour, colour], linewidth=2)
+        axs[1].set_title("OB marginal truncation")
+    plt.show()
 
-def BM_coeff(x_OB, x_OG, beta):
-    '''Compute (1 / n) sum j = 1 to n of P(X_OB | X_OG, Beta_j): binomial pmfs.'''
+# ------------------------------------------------
+# Summarise observed truncation
+# ------------------------------------------------
 
-    return scipy.stats.binom.pmf(x_OB, x_OG, beta)
-
-def compute_state_trunc(x1_OB, x2_OB, beta, thresh_OG):
+def summarise_truncation(truncation_OB, truncationM_OB):
     '''
-    Compute box truncation around states (x1_OG, x2_OG) which have
-    B_coeff(x1_OB, x2_OB, x1_OG, x2_OG, beta) >= thresh_OG
-
-    returns: min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG
+    Summarise states included in collection of observed truncations
     '''
 
-    trunc_start = False
-    trunc_end = False
-    min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = np.inf, 0, np.inf, 0
-    diag = 0
-    while (not trunc_start) or (not trunc_end):
+    # state set
+    state_pairs = set()
+    states = set()
 
-        # flag if at least one coeff > thresh in diagonal
-        trunc_diag = False
+    # loop over each truncation
+    for i, trunc in truncation_OB.items():
 
-        # diagonal from upper right to lower left
-        x1_OG_diag = np.array([x1_OB + i for i in range(diag + 1)])
-        x2_OG_diag = np.array([x2_OB + diag - i for i in range(diag + 1)])
+        # for each state pair in truncation
+        for x1_OB in range(trunc['min_x1_OB'], trunc['max_x1_OB'] + 1):
+            for x2_OB in range(trunc['min_x2_OB'], trunc['max_x2_OB'] + 1):
 
-        # compute coeffs
-        coeffs = B_coeff(x1_OB, x2_OB, x1_OG_diag, x2_OG_diag, beta)
+                # add to set
+                state_pairs.add((x1_OB, x2_OB))
+                states.add(x1_OB)
+                states.add(x2_OB)
 
-        # find where above threshold
-        idxs = np.argwhere(coeffs > 10**-6).reshape(-1)
+    # also add any single states (not pairs) in marginal truncations that were missed
+    for i, trunc in truncationM_OB.items():
+        for x1_OB in range(trunc['minM_x1_OB'], trunc['maxM_x1_OB'] + 1):
+            states.add(x1_OB)
+        for x2_OB in range(trunc['minM_x2_OB'], trunc['maxM_x2_OB'] + 1):
+            states.add(x2_OB)
 
-        # if any values above threshold
-        if idxs.size > 0:
+    # collect info
+    info_dict = {
+        'state_pairs': state_pairs,
+        'states': states
+    }
 
-            # at least one coeff > thresh (overall)
-            trunc_start = True
+    return info_dict
 
-            # at least one coeff > thresh (in diag)
-            trunc_diag = True
+# ------------------------------------------------
+# Compute original truncation
+# ------------------------------------------------
 
-            # find states above threshold
-            x1_states = x1_OG_diag[idxs]
-            x2_states = x2_OG_diag[idxs]
+def Bm_trunc(x_OB, x_OG, beta):
+    return np.mean(scipy.stats.binom.pmf(x_OB, x_OG, beta))
 
-            # find boundaries
-            min_x1 = min(x1_states)
-            min_x2 = min(x2_states)
-            max_x1 = max(x1_states)
-            max_x2 = max(x2_states)
-
-            # update truncations
-            if min_x1 < min_x1_OG:
-                min_x1_OG = min_x1
-            if min_x2 < min_x2_OG:
-                min_x2_OG = min_x2
-            if max_x1 > max_x1_OG:
-                max_x1_OG = max_x1
-            if max_x2 > max_x2_OG:
-                max_x2_OG = max_x2
-
-        # if NO coeff > thresh (in diag) AND at least one coeff > thresh (overall)
-        if (not trunc_diag) and trunc_start:
-
-            # end
-            trunc_end = True
-
-        # increment diagonal
-        diag += 1
-
-    # cast to int
-    min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = int(min_x1_OG), int(max_x1_OG), int(min_x2_OG), int(max_x2_OG)
-
-    return min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG
-
-def compute_state_truncM(x_OB, beta, threshM_OG):
-    '''
-    Compute interval truncation of states x_OG which have
-    B(x_OB, x_OG, beta) >= threshM_OG
-    
-    returns: minM_OG, maxM_OG
-    '''
+def marginal_truncation(x_OB, beta, thresh_OG=10**-6):
 
     # start at first non-zero coefficient
     x_OG = x_OB
-    coeff = BM_coeff(x_OB, x_OG, beta)
+    coeff = Bm_trunc(x_OB, x_OG, beta)
 
     # if not above threshold: increment until above
-    while coeff < threshM_OG:
+    while coeff < thresh_OG:
 
         # increment
         x_OG += 1
 
         # compute coeff
-        coeff = BM_coeff(x_OB, x_OG, beta)
+        coeff = Bm_trunc(x_OB, x_OG, beta)
 
     # store first state coeff >= thresh
     minM_OG = x_OG
 
     # increment until below threshold
-    while coeff >= threshM_OG:
+    while coeff >= thresh_OG:
 
         # increment
         x_OG += 1
 
         # compute coeff
-        coeff = BM_coeff(x_OB, x_OG, beta)
+        coeff = Bm_trunc(x_OB, x_OG, beta)
 
     # store last state with coeff >= thresh (INCLUSIVE BOUND)
     maxM_OG = x_OG - 1
 
     return minM_OG, maxM_OG
 
-def compute_truncation(size, beta, thresh_OG):
-    '''
-    Compute dictionary of truncations for original state pairs
+def original_truncation(truncation_summary, beta, thresh_OG=10**-6, tqdm_disable=True):
+    
+    # collect OG truncations
+    truncation_dict = {}
 
-    size: grid size of observed pairs that truncations are computed for
-    beta: capture efficiency vector
-    thresh_OG: threshold for trunction
-    '''
-    # store in dictionary
-    truncations = {}
-
-    # for each pair of observed counts
-    for x1_OB in tqdm.tqdm(range(size)):
-        for x2_OB in range(x1_OB + 1):
-
-            # compute truncation bounds
-            min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG = compute_state_trunc(x1_OB, x2_OB, beta, thresh_OG)
-
-            # store
-            truncations[f'({x1_OB}, {x2_OB})'] = (min_x1_OG, max_x1_OG, min_x2_OG, max_x2_OG)
-
-            # store symmetric version
-            truncations[f'({x2_OB}, {x1_OB})'] = (min_x2_OG, max_x2_OG, min_x1_OG, max_x1_OG)
-
-    return truncations
-
-def compute_truncationM(size, beta, threshM_OG):
-    '''
-    Compute dict of original truncations
-
-    size: number of states that truncations are computed for
-    beta: capture efficiency vector
-    threshM_OG: threshold for trunction
-    '''
-    # store in dictionary
-    truncations = {}
-
-    # for each observed count
-    for x_OB in tqdm.tqdm(range(max)):
-
-        # compute truncation bounds
-        minM_OG, maxM_OG = compute_state_truncM(x_OB, beta, threshM_OG)
+    # compute truncation for each observed count
+    for x_OB in tqdm.tqdm(truncation_summary['states'], disable=tqdm_disable):
+        
+        minM_OG, maxM_OG = marginal_truncation(x_OB, beta, thresh_OG)
 
         # store
-        truncations[f'{x_OB}'] = (minM_OG, maxM_OG)
+        truncation_dict[x_OB] = (minM_OG, maxM_OG)
 
-    return truncations
+    return truncation_dict
+
+# ------------------------------------------------
+# Coefficients
+# ------------------------------------------------
+
+def Bm_matrix(x_OB, x_OG, beta):
+    return scipy.stats.binom.pmf(x_OB, x_OG, beta)
+
+def compute_coefficients(truncation_summary, truncation_OG, beta, name, thresh_OG=10**-6, tqdm_disable=True):
+
+    # store marginal grids
+    marginal_grids = {}
+
+    # loop over observed counts
+    for x_OB in tqdm.tqdm(truncation_summary['states'], disable=tqdm_disable):
+        
+        # get truncation
+        minM_OG, maxM_OG = truncation_OG[x_OB]
+
+        # construct arrays for broadcasting
+        x_OB_arr = np.array([x_OB])[:, None]
+        x_OG_arr = np.arange(minM_OG, maxM_OG + 1)[:, None]
+        beta_arr = beta[None, :]
+          
+        # compute marginal grid
+        marginal_grid = Bm_matrix(x_OB_arr, x_OG_arr, beta_arr)
+
+        # store
+        marginal_grids[x_OB] = marginal_grid
+
+        # take mean over beta to get marginal coefficient array
+        marginal_array = np.mean(marginal_grid, axis=1)
+
+        # save
+        np.save(
+            f"./Temp/{name}/Coefficients/state-{x_OB}.npy",
+            marginal_array
+        )
+
+    # loop over oberved count pairs
+    for x1_OB, x2_OB in tqdm.tqdm(truncation_summary['state_pairs'], disable=tqdm_disable):
+
+        # get marginal grids
+        grid_x1_OB = marginal_grids[x1_OB]
+        grid_x2_OB = marginal_grids[x2_OB]
+
+        # compute outer product
+        coeff_grid = grid_x1_OB @ grid_x2_OB.T
+
+        # threshold
+        coeff_grid[coeff_grid < thresh_OG] = 0.0
+
+        # divide by sample size
+        coeff_grid /= len(beta)
+
+        # save
+        np.save(
+            f"./Temp/{name}/Coefficients/state-{x1_OB}-{x2_OB}.npy",
+            coeff_grid
+        )
+
+# ------------------------------------------------
+# Compute original truncation extent
+# ------------------------------------------------
+
+def compute_original_extent(truncation_OB, truncationM_OB, truncation_OG):
+
+    # store per sample extent
+    extent_dict = {}
+
+    # for each sample
+    for sample in truncation_OB.keys():
+
+        # record min and max OG state extents
+        min_x1_OG_ext, max_x1_OG_ext = np.inf, 0
+        min_x2_OG_ext, max_x2_OG_ext = np.inf, 0
+
+        # get OB truncation
+        trunc_OB = truncation_OB[sample]
+
+        # loop over OG truncation to get OG states used and update extent
+        for x1_OB in range(trunc_OB['min_x1_OB'], trunc_OB['max_x1_OB'] + 1):
+            min_x1_OG, max_x1_OG = truncation_OG[x1_OB]
+            if min_x1_OG < min_x1_OG_ext:
+                min_x1_OG_ext = min_x1_OG
+            if max_x1_OG > max_x1_OG_ext:
+                max_x1_OG_ext = max_x1_OG
+
+        for x2_OB in range(trunc_OB['min_x2_OB'], trunc_OB['max_x2_OB'] + 1):
+            min_x2_OG, max_x2_OG = truncation_OG[x2_OB]
+            if min_x2_OG < min_x2_OG_ext:
+                min_x2_OG_ext = min_x2_OG
+            if max_x2_OG > max_x2_OG_ext:
+                max_x2_OG_ext = max_x2_OG
+
+        # get marginal OB truncation
+        truncM_OB = truncationM_OB[sample]
+
+        # repeat same process to update extent
+        for x1_OB in range(truncM_OB['minM_x1_OB'], truncM_OB['maxM_x1_OB'] + 1):
+            min_x1_OG, max_x1_OG = truncation_OG[x1_OB]
+            if min_x1_OG < min_x1_OG_ext:
+                min_x1_OG_ext = min_x1_OG
+            if max_x1_OG > max_x1_OG_ext:
+                max_x1_OG_ext = max_x1_OG
+
+        for x2_OB in range(truncM_OB['minM_x2_OB'], truncM_OB['maxM_x2_OB'] + 1):
+            min_x2_OG, max_x2_OG = truncation_OG[x2_OB]
+            if min_x2_OG < min_x2_OG_ext:
+                min_x2_OG_ext = min_x2_OG
+            if max_x2_OG > max_x2_OG_ext:
+                max_x2_OG_ext = max_x2_OG
+
+        # store extent for the sample
+        extent_dict[sample] = {
+            'min_x1_OG': min_x1_OG_ext,
+            'max_x1_OG': max_x1_OG_ext,
+            'min_x2_OG': min_x2_OG_ext,
+            'max_x2_OG': max_x2_OG_ext
+        }
+
+    return extent_dict
