@@ -35,10 +35,10 @@ import pandas as pd
 import tqdm
 
 # ------------------------------------------------
-# Functions
+# Gillespie simulation
 # ------------------------------------------------
 
-def gillespie(params, n, beta, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
+def gillespie(params, n, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
     '''
     Simulate a sample path of birth-death regulation model.
 
@@ -52,26 +52,13 @@ def gillespie(params, n, beta, tmax=100, ts=10, plot=False, initial_state=(0, 0)
         params: dict of reaction rate constants 'k_tx_1', 'k_tx_2', 'k_deg_1',
                 'k_deg_2', 'k_deg'
         n: sample size
-        beta: per cell capture efficiency vector of size n / single value
         tmax: burn-in time of simulation
         ts: time between samples
         plot: toggle plotting of sample path
         intitial_state: starting state of simulation
 
     Returns:
-        A dictionary containing results
-
-        Samples without capture efficiency
-
-        'x1_OG': n samples from gene 1
-        'x2_OG': n samples from gene 2
-        'OG': n pairs of samples
-
-        Samples with capture efficiency
-
-        'x1_OB': n samples from gene 1 affected by capture efficiency
-        'x2_OB': n samples from gene 2 affected by capture efficiency
-        'OB': n pairs of samples affected by capture efficiency
+        samples: n pairs of integers sampled from the reaction network
     '''
 
     # initialize random generator
@@ -140,13 +127,8 @@ def gillespie(params, n, beta, tmax=100, ts=10, plot=False, initial_state=(0, 0)
     x1_samples = [int(x1) for x1 in x1_samples]
     x2_samples = [int(x2) for x2 in x2_samples]
 
-    # apply capture efficiency: for each count, draw from Binomial(count, beta)
-    x1_samples_beta = np.random.binomial(x1_samples, beta).tolist()
-    x2_samples_beta = np.random.binomial(x2_samples, beta).tolist()
-
     # re-combine to pairs of samples
     samples = list(zip(x1_samples, x2_samples))
-    samples_beta = list(zip(x1_samples_beta, x2_samples_beta))
 
     # plot sample paths
     if plot:
@@ -159,20 +141,71 @@ def gillespie(params, n, beta, tmax=100, ts=10, plot=False, initial_state=(0, 0)
         plt.legend()
         plt.show()
 
-    # collect all sample paths: original and observed
-    data = {
-        'x1_OG': x1_samples,
-        'x2_OG': x2_samples,
-        'OG': samples,
-        'x1_OB': x1_samples_beta,
-        'x2_OB': x2_samples_beta,
-        'OB': samples_beta
-    }
+    return samples
 
-    return data
+# ------------------------------------------------
+# Dataset simulation: interaction range
+# ------------------------------------------------
 
-def dataset_simulation(beta, gene_pairs=100, cells=1000, interaction_chance=0.5,
-                       conditional=False, sig=0.5, plot=False):
+def simulate_dataset_range(cells, interaction_values, rate=1):
+    '''
+    Produce a dataset of pairs of samples with fixed parameters (rate) over a
+    range of interaction strength values.
+
+    Args:
+        cells: number of samples to simulate per gene-pair
+        interaction_values: k_reg parameters values to simulate samples for
+        rate: k_tx parameter values for all genes
+
+    Returns:
+        Dataset instance containing information as attributes
+
+        params_df: pandas dataframe of model parameters per gene-pair
+        counts_df: pandas dataframe of sampled counts per gene-pair
+    '''
+
+    # number of pairs
+    gene_pairs = len(interaction_values)
+
+    # dataframes
+    params_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=['k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
+    counts_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=[f"Cell-{j}" for j in range(cells)])
+
+    # for each gene
+    for i in tqdm.tqdm(range(gene_pairs)):
+
+        # Set reaction rate parameters
+        k_tx_1 = rate
+        k_tx_2 = rate
+        k_deg_1 = 1
+        k_deg_2 = 1
+        k_reg = interaction_values[i]
+
+        # store parameters
+        params_df.iloc[i] = [k_tx_1, k_tx_2, k_deg_1, k_deg_2, k_reg]
+
+        params = {
+            'k_tx_1': k_tx_1,
+            'k_tx_2': k_tx_2,
+            'k_deg_1': k_deg_1,
+            'k_deg_2': k_deg_2,
+            'k_reg': k_reg
+        }
+
+        # simulate sample from model
+        sample = gillespie(params, cells)
+
+        # store counts
+        counts_df.iloc[i] = sample
+
+    return {'params_df': params_df, 'counts_df': counts_df}
+
+# ------------------------------------------------
+# Dataset simulation: log-uniform parameters
+# ------------------------------------------------
+
+def simulate_dataset_sampled(gene_pairs=100, cells=1000, interaction_chance=0.5,
+                             conditional=False, sig=0.5, scale=1, plot=False):
     '''
     Produce dataset of gene pairs' simulated parameters and samples.
 
@@ -193,13 +226,14 @@ def dataset_simulation(beta, gene_pairs=100, cells=1000, interaction_chance=0.5,
                      sampled independently (False) or conditionally (True)
         sig: standard deviation about common value for parameters of each gene
              during conditional sampling 
+        scale: scaling of transcription rate (previously mean capture)
         plot: toggle plotting a scatter plot of the simulated parameters
 
     Returns:
-        A dictionary containing results
+        Dataset instance containing information as attributes
 
-        'params_df': pandas dataframe of model parameters per gene-pair
-        'counts_df': pandas dataframe of sampled counts per gene-pair
+        params_df: pandas dataframe of model parameters per gene-pair
+        counts_df: pandas dataframe of sampled counts per gene-pair
     '''
 
     # initialize random generator
@@ -253,8 +287,8 @@ def dataset_simulation(beta, gene_pairs=100, cells=1000, interaction_chance=0.5,
             if interaction: log_k_reg = rng.uniform(-2, 2)
 
         # exponentiate and scale
-        k_tx_1 = (10 ** log_k_tx_beta_1) / np.mean(beta)
-        k_tx_2 = (10 ** log_k_tx_beta_2) / np.mean(beta)
+        k_tx_1 = (10 ** log_k_tx_beta_1) / scale
+        k_tx_2 = (10 ** log_k_tx_beta_2) / scale
         k_deg_1 = 10 ** log_k_deg_1
         k_deg_2 = 10 ** log_k_deg_2
         if interaction:
@@ -274,10 +308,10 @@ def dataset_simulation(beta, gene_pairs=100, cells=1000, interaction_chance=0.5,
         }
 
         # simulate sample from model
-        sample = gillespie(params, cells, beta)
+        samples = gillespie(params, cells)
 
         # store counts
-        counts_df.iloc[i] = sample['OB']
+        counts_df.iloc[i] = samples
 
     # plot
     if plot:
