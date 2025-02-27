@@ -83,7 +83,7 @@ class Dataset():
         '''
 
         # fail if dataset already downsampled
-        if not (self.beta == np.array([1.0 for j in range(self.cells)])):
+        if not (self.beta == np.array([1.0 for j in range(self.cells)])).all():
             print("Dataset has already been downsampled")
             return None
 
@@ -105,7 +105,7 @@ class Dataset():
         for i in range(self.gene_pairs):
 
             # extract counts
-            sample = self.counts_df.iloc[i]
+            sample = self.count_dataset.iloc[i]
             x1_sample = [x[0] for x in sample]
             x2_sample = [x[1] for x in sample]
 
@@ -209,15 +209,15 @@ class Dataset():
             # OR:
             # save CI bounds
             np.save(
-                f"./Temp/{self.name}/Bounds/Joint/sample-{i}.npy",
+                f"./Temp/Bounds/Joint/{self.name}-sample-{i}.npy",
                 prob_results['bounds']
             )
             np.save(
-                f"./Temp/{self.name}/Bounds/x1_marginal/sample-{i}.npy",
+                f"./Temp/Bounds/x1_marginal/{self.name}-sample-{i}.npy",
                 prob_results['x1_bounds']
             )
             np.save(
-                f"./Temp/{self.name}/Bounds/x2_marginal/sample-{i}.npy",
+                f"./Temp/Bounds/x2_marginal/{self.name}-sample-{i}.npy",
                 prob_results['x2_bounds']
             )
 
