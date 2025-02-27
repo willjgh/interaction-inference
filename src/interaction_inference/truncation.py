@@ -159,7 +159,7 @@ def compute_coefficients(truncation_summary, truncation_OG, beta, name, thresh_O
 
         # save
         np.save(
-            f"./Temp/{name}/Coefficients/state-{x_OB}.npy",
+            f"./Temp/Coefficients/{name}-state-{x_OB}.npy",
             marginal_array
         )
 
@@ -181,7 +181,7 @@ def compute_coefficients(truncation_summary, truncation_OG, beta, name, thresh_O
 
         # save
         np.save(
-            f"./Temp/{name}/Coefficients/state-{x1_OB}-{x2_OB}.npy",
+            f"./Temp/Coefficients/{name}-state-{x1_OB}-{x2_OB}.npy",
             coeff_grid
         )
 
