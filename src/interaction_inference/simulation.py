@@ -148,7 +148,7 @@ def gillespie(params, n, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
 # Dataset simulation: interaction range
 # ------------------------------------------------
 
-def simulate_dataset_range(name, interaction_values, cells=1000, rate=1):
+def simulate_dataset_range(name, interaction_values, cells=1000, rate=1, tqdm_disable=True):
     '''
     Produce a dataset of pairs of samples with fixed parameters (rate) over a
     range of interaction strength values.
@@ -173,7 +173,7 @@ def simulate_dataset_range(name, interaction_values, cells=1000, rate=1):
     counts_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=[f"Cell-{j}" for j in range(cells)])
 
     # for each gene
-    for i in tqdm.tqdm(range(gene_pairs)):
+    for i in tqdm.tqdm(range(gene_pairs), disable=tqdm_disable):
 
         # Set reaction rate parameters
         k_tx_1 = rate
@@ -200,10 +200,9 @@ def simulate_dataset_range(name, interaction_values, cells=1000, rate=1):
         counts_df.iloc[i] = sample
 
     # construct dataset object
-    data = dataset.Dataset()
+    data = dataset.Dataset(name)
 
     # store information
-    data.name = name
     data.count_dataset = counts_df
     data.param_dataset = params_df
     data.cells = cells
@@ -217,7 +216,7 @@ def simulate_dataset_range(name, interaction_values, cells=1000, rate=1):
 # ------------------------------------------------
 
 def simulate_dataset_sampled(name, gene_pairs=100, cells=1000, interaction_chance=0.5,
-                             conditional=False, sig=0.5, scale=1, plot=False):
+                             conditional=False, sig=0.5, scale=1, plot=False, tqdm_disable=True):
     '''
     Produce dataset of gene pairs' simulated parameters and samples.
 
@@ -256,7 +255,7 @@ def simulate_dataset_sampled(name, gene_pairs=100, cells=1000, interaction_chanc
     counts_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=[f"Cell-{j}" for j in range(cells)])
 
     # for each gene
-    for i in tqdm.tqdm(range(gene_pairs)):
+    for i in tqdm.tqdm(range(gene_pairs), disable=tqdm_disable):
 
         # Select if interation or not
         u = rng.uniform()
@@ -334,10 +333,9 @@ def simulate_dataset_sampled(name, gene_pairs=100, cells=1000, interaction_chanc
         plt.show()
 
     # construct dataset object
-    data = dataset.Dataset()
+    data = dataset.Dataset(name)
 
     # store information
-    data.name = name
     data.count_dataset = counts_df
     data.param_dataset = params_df
     data.cells = cells
