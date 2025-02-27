@@ -28,6 +28,7 @@ sample = gillespie(rng, params, 1000, 0.5)
 # Dependencies
 # ------------------------------------------------
 
+from interaction_inference import dataset
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
@@ -147,7 +148,7 @@ def gillespie(params, n, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
 # Dataset simulation: interaction range
 # ------------------------------------------------
 
-def simulate_dataset_range(cells, interaction_values, rate=1):
+def simulate_dataset_range(name, interaction_values, cells=1000, rate=1):
     '''
     Produce a dataset of pairs of samples with fixed parameters (rate) over a
     range of interaction strength values.
@@ -198,13 +199,24 @@ def simulate_dataset_range(cells, interaction_values, rate=1):
         # store counts
         counts_df.iloc[i] = sample
 
-    return {'params_df': params_df, 'counts_df': counts_df}
+    # construct dataset object
+    data = dataset.Dataset()
+
+    # store information
+    data.name = name
+    data.count_dataset = counts_df
+    data.param_dataset = params_df
+    data.cells = cells
+    data.gene_pairs = len(interaction_values)
+    data.beta = np.array([1.0 for j in range(cells)])
+
+    return data
 
 # ------------------------------------------------
 # Dataset simulation: log-uniform parameters
 # ------------------------------------------------
 
-def simulate_dataset_sampled(gene_pairs=100, cells=1000, interaction_chance=0.5,
+def simulate_dataset_sampled(name, gene_pairs=100, cells=1000, interaction_chance=0.5,
                              conditional=False, sig=0.5, scale=1, plot=False):
     '''
     Produce dataset of gene pairs' simulated parameters and samples.
@@ -321,4 +333,15 @@ def simulate_dataset_sampled(gene_pairs=100, cells=1000, interaction_chance=0.5,
         plt.title("Scatter plot of gene-pair parameters")
         plt.show()
 
-    return {'params_df': params_df, 'counts_df': counts_df}
+    # construct dataset object
+    data = dataset.Dataset()
+
+    # store information
+    data.name = name
+    data.count_dataset = counts_df
+    data.param_dataset = params_df
+    data.cells = cells
+    data.gene_pairs = gene_pairs
+    data.beta = np.array([1.0 for j in range(cells)])
+    
+    return data
