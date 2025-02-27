@@ -47,7 +47,6 @@ class Dataset():
         self.truncation_OB = None
         self.truncationM_OB = None
         self.truncation_OG = None
-        self.extent_OG = None
 
         # moment bounds
         self.moments_OB = None
@@ -56,7 +55,6 @@ class Dataset():
         # probability bounds
         self.probs_OB = None
         self.prob_extent_OG = None
-
 
     def load_dataset(self, count_dataset_filename, beta=None, param_dataset_filename=None):
         '''Load dataset from csv files: paramter and count data'''
@@ -69,14 +67,12 @@ class Dataset():
         self.gene_pairs, self.cells = self.count_dataset.shape
         self.beta = beta
 
-
     def store_dataset(self, count_dataset_filename, param_dataset_filename=None):
         '''Store dataset as csv files: parameter and count data'''
         self.count_dataset.to_csv(count_dataset_filename)
         if param_dataset_filename:
             # parameter dataset only available for simulated data
             self.param_dataset.to_csv(param_dataset_filename)
-
 
     def downsample(self, name, beta):
         '''
@@ -134,8 +130,7 @@ class Dataset():
         downsampled_dataset.gene_pairs = self.gene_pairs
 
         return downsampled_dataset
-
-    
+ 
     def compute_moments(self, tqdm_disable=True):
         '''
         For each over samples in dataset compute bootstrap CI bounds on moments
@@ -171,10 +166,6 @@ class Dataset():
         # store information
         self.moments_OB = moment_dict
         self.moment_extent_OG = extent_dict
-
-        # update overall extent
-        self.extent_OG = truncation.combine_extent(self.moment_extent_OG, self.prob_extent_OG)
-
 
     def bootstrap_probabilities(self, tqdm_disable=True):
         '''
@@ -265,6 +256,3 @@ class Dataset():
         # store information
         self.truncation_OG = truncation_OG
         self.prob_extent_OG = prob_extent_OG
-
-        # update overall extent
-        self.extent_OG = truncation.combine_extent(self.moment_extent_OG, self.prob_extent_OG)

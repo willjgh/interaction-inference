@@ -248,60 +248,86 @@ def compute_original_extent(truncation_OB, truncationM_OB, truncation_OG):
     return extent_dict
 
 # ------------------------------------------------
-# Combine truncation extents
+# Compute overall truncation extent
 # ------------------------------------------------
 
 def combine_extent(moment_extent, prob_extent):
     '''
     Combine moment and probability OG state extents for each sample
-    to produce an overall extent including all states. If only one
-    extent computed then simply copy over.
+    to produce an overall extent including all states.
     '''
 
-    # combine extents
-    if moment_extent and prob_extent:
-
-        # create combined extent
-        extent = {}
-
-        # for each sample
-        for sample in moment_extent.keys():
-
-            # sample dict
-            extent[sample] = {}
-
-            # get both extents
-            ext_1 = moment_extent[sample]
-            ext_2 = prob_extent[sample]
-
-            # combine
-            if ext_1['max_x1_OG'] > ext_2['max_x1_OG']:
-                extent[sample]['max_x1_OG'] = ext_1['max_x1_OG']
-            else:
-                extent[sample]['max_x1_OG'] = ext_2['max_x1_OG']
-            if ext_1['max_x2_OG'] > ext_2['max_x2_OG']:
-                extent[sample]['max_x2_OG'] = ext_1['max_x2_OG']
-            else:
-                extent[sample]['max_x2_OG'] = ext_2['max_x2_OG']
-            if ext_1['min_x1_OG'] < ext_2['min_x1_OG']:
-                extent[sample]['min_x1_OG'] = ext_1['min_x1_OG']
-            else:
-                extent[sample]['min_x1_OG'] = ext_2['min_x1_OG']
-            if ext_1['min_x2_OG'] < ext_2['min_x2_OG']:
-                extent[sample]['min_x2_OG'] = ext_1['min_x2_OG']
-            else:
-                extent[sample]['min_x2_OG'] = ext_2['min_x2_OG']
-
-        return extent
-
-    # copy moment extent
-    elif moment_extent:
-        return moment_extent
-    
-    # copy prob extent
-    elif prob_extent:
-        return prob_extent
-    
-    # neither available
-    else:
+    # error if not available
+    if moment_extent is None:
+        print("Constraints need moment information but not available")
         return None
+    if prob_extent is None:
+        print("Constraints need probability information but not available")
+        return None
+
+    # create combined extent
+    extent = {}
+
+    # for each sample
+    for sample in moment_extent.keys():
+
+        # sample dict
+        extent[sample] = {}
+
+        # get both extents
+        ext_1 = moment_extent[sample]
+        ext_2 = prob_extent[sample]
+
+        # combine
+        if ext_1['max_x1_OG'] > ext_2['max_x1_OG']:
+            extent[sample]['max_x1_OG'] = ext_1['max_x1_OG']
+        else:
+            extent[sample]['max_x1_OG'] = ext_2['max_x1_OG']
+        if ext_1['max_x2_OG'] > ext_2['max_x2_OG']:
+            extent[sample]['max_x2_OG'] = ext_1['max_x2_OG']
+        else:
+            extent[sample]['max_x2_OG'] = ext_2['max_x2_OG']
+        if ext_1['min_x1_OG'] < ext_2['min_x1_OG']:
+            extent[sample]['min_x1_OG'] = ext_1['min_x1_OG']
+        else:
+            extent[sample]['min_x1_OG'] = ext_2['min_x1_OG']
+        if ext_1['min_x2_OG'] < ext_2['min_x2_OG']:
+            extent[sample]['min_x2_OG'] = ext_1['min_x2_OG']
+        else:
+            extent[sample]['min_x2_OG'] = ext_2['min_x2_OG']
+
+    return extent
+
+def compute_overall_extent(constraints, moment_extent, prob_extent):
+    '''
+    Compute overall extent of OG states for constraints used.
+    '''
+    
+    # flag if any moment / probability constraints used
+    moment_flag = False
+    prob_flag = False
+    for constr_name in constraints:
+        if 'moment' in constr_name:
+            moment_flag = True
+        if 'probability' in constr_name:
+            prob_flag = True
+
+    # both are used: combine extents
+    if moment_flag and prob_flag:
+        overall_extent = combine_extent(moment_extent, prob_extent)
+
+    # only moment used: copy moment extent
+    elif moment_flag:
+        overall_extent = moment_extent
+
+    # only prob used: copy prob extent
+    elif prob_flag:
+        overall_extent = prob_extent
+
+    # neither used
+    else:
+        overall_extent = None
+
+    return overall_extent
+
+    
