@@ -96,8 +96,8 @@ def bootstrap_moments(sample, beta, resamples=None):
     prod_mean_bounds = np.quantile(prod_means, [0.025, 0.975], axis=0)
     square_mean_bounds = np.quantile(square_means, [0.025, 0.975], axis=0)
 
-    # collect information
-    result_dict = {
+    # moment bounds
+    moments_OB = {
         'E_x1': mean_bounds[:, 0],
         'E_x2': mean_bounds[:, 1],
         'E_x1_x2': prod_mean_bounds,
@@ -105,7 +105,7 @@ def bootstrap_moments(sample, beta, resamples=None):
         'E_x2_sq': square_mean_bounds[:, 1]
     }
 
-    # truncation information
+    # OG truncation information
 
     # compute maximum x1 and x2 values
     max_x1_OB = int(np.max(x1_sample))
@@ -115,8 +115,22 @@ def bootstrap_moments(sample, beta, resamples=None):
     E_beta = np.mean(beta)
 
     # scale by mean capture to get max OG values
-    result_dict['max_x1_OG'] = int(max_x1_OB / E_beta) + 1
-    result_dict['max_x2_OG'] = int(max_x2_OB / E_beta) + 1
+    max_x1_OG = int(max_x1_OB / E_beta) + 1
+    max_x2_OG = int(max_x2_OB / E_beta) + 1
+
+    # moment OG truncation
+    truncation_OG = {
+        'min_x1_OG': 0,
+        'max_x1_OG': max_x1_OG,
+        'min_x2_OG': 0,
+        'max_x2_OG': max_x2_OG
+    }
+
+    # collect information
+    result_dict = {
+        'moments_OB': moments_OB,
+        'truncation_OG': truncation_OG
+    }
 
     return result_dict
 
