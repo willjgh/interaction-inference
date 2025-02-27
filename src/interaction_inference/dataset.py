@@ -51,9 +51,11 @@ class Dataset():
 
         # moment bounds
         self.moments_OB = None
+        self.moment_extent_OG = None
 
         # probability bounds
         self.probs_OB = None
+        self.prob_extent_OG = None
 
 
     def load_dataset(self, count_dataset_filename, beta=None, param_dataset_filename=None):
@@ -134,7 +136,7 @@ class Dataset():
         return downsampled_dataset
 
     
-    def bootstrap_moments(self, tqdm_disable=True):
+    def compute_moments(self, tqdm_disable=True):
         '''
         For each over samples in dataset compute bootstrap CI bounds on moments
         and compute original truncation information, storing this in attributes
@@ -143,6 +145,9 @@ class Dataset():
 
         # collect moment bounds
         moment_dict = {}
+
+        # collect moment extent
+        extent_dict = {}
 
         # loop over samples
         for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
@@ -158,10 +163,17 @@ class Dataset():
             )
 
             # store moments
-            moment_dict[f'sample-{i}'] = moment_results
+            moment_dict[f'sample-{i}'] = moment_results['moments_OB']
+
+            # store extent
+            extent_dict[f'sample-{i}'] = moment_results['truncation_OG']
 
         # store information
         self.moments_OB = moment_dict
+        self.moment_extent_OG = extent_dict
+
+        # update overall extent
+        self.extent_OG = truncation.combine_extent(self.moment_extent_OG, self.prob_extent_OG)
 
 
     def bootstrap_probabilities(self, tqdm_disable=True):
@@ -226,7 +238,7 @@ class Dataset():
         self.truncationM_OB = truncationM_dict
         self.probs_OB = probs_dict
 
-    def probability_setup(self, display=False, tqdm_disable=True):
+    def compute_probabilities(self, display=False, tqdm_disable=True):
         '''
         Additional setup needed for probability constraints.
         '''
@@ -248,8 +260,11 @@ class Dataset():
         truncation.compute_coefficients(truncation_summary, truncation_OG, self.beta, self.name, self.thresh_OG, tqdm_disable=tqdm_disable)
 
         # compute original extent
-        extent_OG = truncation.compute_original_extent(self.truncation_OB, self.truncationM_OB, truncation_OG)
+        prob_extent_OG = truncation.compute_original_extent(self.truncation_OB, self.truncationM_OB, truncation_OG)
 
         # store information
         self.truncation_OG = truncation_OG
-        self.extent_OG = extent_OG
+        self.prob_extent_OG = prob_extent_OG
+
+        # update overall extent
+        self.extent_OG = truncation.combine_extent(self.moment_extent_OG, self.prob_extent_OG)
