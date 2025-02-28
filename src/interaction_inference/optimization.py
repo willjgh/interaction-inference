@@ -7,6 +7,7 @@ Module implementing class to handle optimization inference method.
 # ------------------------------------------------
 
 from interaction_inference import truncation
+from interaction_inference import constraints
 import json
 import tqdm
 import numpy as np
@@ -40,7 +41,7 @@ status_codes = {
 # ------------------------------------------------
 
 class Optimization():
-    def __init__(self, dataset, constraints, tqdm_disable=False, printing=True):
+    def __init__(self, dataset, constraints, time_limit=300, silent=True, K=100, tqdm_disable=False, print_solution=True):
         '''Initialize analysis settings and result storage.'''
         
         # store reference to dataset
@@ -50,31 +51,32 @@ class Optimization():
         self.constraints = constraints
 
         # analysis settings
-        self.license_file = None
-        self.time_limit = 300
-        self.silent = True
-        self.K = 100
-        self.print_solution = False
+        self.license_file = "D:/WLS_credentials.json"
+        self.time_limit = time_limit
+        self.silent = silent
+        self.K = K
+        self.tqdm_disable = tqdm_disable
+        self.print_solution = print_solution
 
         # analyse dataset
-        self.analyse_dataset(tqdm_disable=tqdm_disable, printing=printing)
+        self.analyse_dataset()
 
 
-    def analyse_dataset(self, tqdm_disable=False, printing=True):
+    def analyse_dataset(self):
         '''Analyse given dataset using method settings and store results.'''
 
         # dict to store results
         solution_dict = {}
 
         # compute overall OG extent for constraints used
-        self.overall_extent = truncation.compute_overall_extent(
+        self.overall_extent_OG = truncation.compute_overall_extent(
             self.constraints,
             self.dataset.moment_extent_OG,
             self.dataset.prob_extent_OG
         )
 
         # loop over gene pairs in dataset
-        for i in tqdm.tqdm(range(self.dataset.gene_pairs), tqdm_disable=tqdm_disable):
+        for i in tqdm.tqdm(range(self.dataset.gene_pairs), disable=self.tqdm_disable):
 
             # optimize sample i
             solution_dict[i] = self.optimize(i)
@@ -107,32 +109,12 @@ class Optimization():
 
                 # set optimization parameters
                 model.Params.TimeLimit = self.time_limit
-                K = 100
 
                 # create variables
-
-                # marginal stationary distributions
-                p1 = model.addMVar(shape=(self.overall_extent[f'sample-{i}']['max_x1_OG'] + 1), vtype=GRB.CONTINUOUS, name="p1", lb=0, ub=1)
-                p2 = model.addMVar(shape=(self.overall_extent[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p2", lb=0, ub=1)
-
-                # reaction rate constants
-                rate_names = ['k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2']
-                rates = model.addVars(rate_names, vtype=GRB.CONTINUOUS, lb=0, ub=K, name=rate_names)
-
-                # collect variables
-                variables = {
-                    'p1': p1,
-                    'p2': p2,
-                    'k_tx_1': rates['k_tx_1'],
-                    'k_tx_2': rates['k_tx_2'],
-                    'k_deg_1': rates['k_deg_1'],
-                    'k_deg_2': rates['k_deg_2']
-                }
+                variables = constraints.add_variables(self, model, i)
 
                 # add constraints
-                '''
-                TODO
-                '''
+                constraints.add_constraints(self, model, variables, i)
                 
                 # optimize: test feasibility
                 model.setObjective(0, GRB.MINIMIZE)
