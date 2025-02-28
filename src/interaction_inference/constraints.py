@@ -11,19 +11,124 @@ import gurobipy as gp
 from gurobipy import GRB
 
 # ------------------------------------------------
+# Variables
+# ------------------------------------------------
+
+def add_variables(optimization, model, i):
+
+    # stage variables to be added
+    staged_variables = set()
+
+    if "probability" in optimization.constraints:
+        staged_variables.update(['p1', 'p2'])
+    if "marginal_probability" in optimization.constraints:
+        staged_variables.update(['p1', 'p2'])
+    if "moment" in optimization.constraints:
+        staged_variables.update(['p1', 'p2'])
+    if "higher_moment" in optimization.constraints:
+        staged_variables.update(['p1', 'p2'])
+    if "CME" in optimization.constraints:
+        staged_variables.update(['p', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+    if "marginal_CME" in optimization.constraints:
+        staged_variables.update(['p1', 'p2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+    if "base" in optimization.constraints:
+        staged_variables.update(['p1', 'p2', 'k_deg_1', 'k_deg_2'])
+    if "factorization" in optimization.constraints:
+        staged_variables.update(['p', 'p1', 'p2'])
+
+    # variable dict
+    variables = {}
+
+    if 'p1' in staged_variables:
+        variables['p1'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1), vtype=GRB.CONTINUOUS, name="p1", lb=0, ub=1)
+    if 'p2' in staged_variables:
+        variables['p2'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p2", lb=0, ub=1)
+    if 'p' in staged_variables:
+        variables['p'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1, optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p", lb=0, ub=1)
+    if 'k_tx_1' in staged_variables:
+        variables['k_tx_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_tx_1", lb=0, ub=optimization.K)
+    if 'k_tx_2' in staged_variables:
+        variables['k_tx_2'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_tx_2", lb=0, ub=optimization.K)
+    if 'k_deg_1' in staged_variables:
+        variables['k_deg_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_deg_1", lb=0, ub=optimization.K)
+    if 'k_deg_2' in staged_variables:
+        variables['k_deg_2'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_deg_2", lb=0, ub=optimization.K)
+
+    return variables
+
+# ------------------------------------------------
 # Constraints
 # ------------------------------------------------
 
-def add_joint_probability_constraints(model, variables, sample_truncation_OB, truncation_OG, i):
+def add_constraints(optimization, model, variables, i):
+
+    if "probability" in optimization.constraints:
+        add_probability_constraints(
+            model,
+            variables,
+            optimization.dataset.truncation_OB[f'sample-{i}'],
+            optimization.dataset.truncation_OG,
+            i,
+            optimization.dataset.name
+        )
+    if "marginal_probability" in optimization.constraints:
+        add_marginal_probability_constraints(
+            model,
+            variables,
+            optimization.dataset.truncationM_OB[f'sample-{i}'],
+            optimization.dataset.truncation_OG,
+            i,
+            optimization.dataset.name
+        )
+    if "moment" in optimization.constraints:
+        add_moment_constraints(
+            model,
+            variables,
+            optimization.dataset.moments_OB[f'sample-{i}'],
+            optimization.dataset.moment_extent_OG[f'sample-{i}'],
+            optimization.dataset.beta
+        )
+    if "higher_moment" in optimization.constraints:
+        add_higher_moment_constraints(
+            model,
+            variables,
+            optimization.dataset.moment_extent_OG[f'sample-{i}'],
+            optimization.dataset.moments_OB[f'sample-{i}'],
+            optimization.dataset.beta
+        )
+    if "CME" in optimization.constraints:
+        add_CME_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+    if "marginal_CME" in optimization.constraints:
+        add_marginal_CME_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+    if "base" in optimization.constraints:
+        add_base_constraints(
+            model,
+            variables
+        )
+    if "factorization" in optimization.constraints:
+        add_factorization_constraints(
+            model,
+            variables
+        )
+
+def add_probability_constraints(model, variables, truncation_OB, truncation_OG, i, dataset_name):
 
     # get OB truncation for sample i
-    min_x1_OB = sample_truncation_OB['min_x1_OB']
-    max_x1_OB = sample_truncation_OB['max_x1_OB']
-    min_x2_OB = sample_truncation_OB['min_x2_OB']
-    max_x2_OB = sample_truncation_OB['max_x2_OB']
+    min_x1_OB = truncation_OB['min_x1_OB']
+    max_x1_OB = truncation_OB['max_x1_OB']
+    min_x2_OB = truncation_OB['min_x2_OB']
+    max_x2_OB = truncation_OB['max_x2_OB']
 
     # load CI bounds for sample i
-    bounds = np.load(f"./Test-Info/Bounds/Joint/sample-{i}.npy")
+    bounds = np.load(f"./Temp/Bounds/Joint/{dataset_name}-sample-{i}.npy")
             
     # for each OB state pair in truncation
     for x1_OB in range(min_x1_OB, max_x1_OB + 1):
@@ -34,7 +139,7 @@ def add_joint_probability_constraints(model, variables, sample_truncation_OB, tr
             min_x2_OG, max_x2_OG = truncation_OG[x2_OB]
             
             # load coefficient grid for OB state pair
-            B_coeffs = np.load(f"./Test-Info/Coefficients/state-{x1_OB}-{x2_OB}.npy")
+            B_coeffs = np.load(f"./Temp/Coefficients/{dataset_name}-state-{x1_OB}-{x2_OB}.npy")
 
             # slice variables to truncation
             p1_slice = variables['p1'][min_x1_OG: max_x1_OG + 1]
@@ -47,17 +152,17 @@ def add_joint_probability_constraints(model, variables, sample_truncation_OB, tr
             model.addConstr(sum_expr >= bounds[0, x1_OB, x2_OB], name=f"B_lb_{x1_OB}_{x2_OB}")
             model.addConstr(sum_expr <= bounds[1, x1_OB, x2_OB], name=f"B_ub_{x1_OB}_{x2_OB}")
 
-def add_marginal_probability_constraints(model, variables, sample_truncationM_OB, truncation_OG, i):
+def add_marginal_probability_constraints(model, variables, truncationM_OB, truncation_OG, i, dataset_name):
 
     # get marginal OB truncation for sample i
-    minM_x1_OB = sample_truncationM_OB['minM_x1_OB']
-    maxM_x1_OB = sample_truncationM_OB['maxM_x1_OB']
-    minM_x2_OB = sample_truncationM_OB['minM_x2_OB']
-    maxM_x2_OB = sample_truncationM_OB['maxM_x2_OB']
+    minM_x1_OB = truncationM_OB['minM_x1_OB']
+    maxM_x1_OB = truncationM_OB['maxM_x1_OB']
+    minM_x2_OB = truncationM_OB['minM_x2_OB']
+    maxM_x2_OB = truncationM_OB['maxM_x2_OB']
 
     # load CI bounds for sample i
-    x1_bounds = np.load(f"./Test-Info/Bounds/x1_marginal/sample-{i}.npy")
-    x2_bounds = np.load(f"./Test-Info/Bounds/x2_marginal/sample-{i}.npy")
+    x1_bounds = np.load(f"./Temp/Bounds/x1_marginal/{dataset_name}-sample-{i}.npy")
+    x2_bounds = np.load(f"./Temp/Bounds/x2_marginal/{dataset_name}-sample-{i}.npy")
 
     # for each OB state in truncation
     for x1_OB in range(minM_x1_OB, maxM_x1_OB + 1):
@@ -66,7 +171,7 @@ def add_marginal_probability_constraints(model, variables, sample_truncationM_OB
         min_x1_OG, max_x1_OG = truncation_OG[x1_OB]
 
         # load marginal coefficient array for OB state
-        Bm_coeffs = np.load(f"./Test-Info/Coefficients/state-{x1_OB}.npy")
+        Bm_coeffs = np.load(f"./Temp/Coefficients/{dataset_name}-state-{x1_OB}.npy")
 
         # slice variable to truncation
         p1_slice = variables['p1'][min_x1_OG: max_x1_OG + 1]
@@ -85,7 +190,7 @@ def add_marginal_probability_constraints(model, variables, sample_truncationM_OB
         min_x2_OG, max_x2_OG = truncation_OG[x2_OB]
 
         # load marginal coefficient array for OB state
-        Bm_coeffs = np.load(f"./Test-Info/Coefficients/state-{x2_OB}.npy")
+        Bm_coeffs = np.load(f"./Temp/Coefficients/{dataset_name}-state-{x2_OB}.npy")
 
         # slice variable to truncation
         p2_slice = variables['p2'][min_x2_OG: max_x2_OG + 1]
@@ -97,69 +202,69 @@ def add_marginal_probability_constraints(model, variables, sample_truncationM_OB
         model.addConstr(sum_expr >= x2_bounds[0, x2_OB], name=f"Bm_x2_lb_{x2_OB}")
         model.addConstr(sum_expr <= x2_bounds[1, x2_OB], name=f"Bm_x2_ub_{x2_OB}")
 
-def add_moment_constraints(model, variables, sample_moments_OB, sample_moment_extent_OG, beta):
+def add_moment_constraints(model, variables, moments_OB, moment_extent_OG, beta):
 
     # moment OG truncation for sample i
-    max_x1_OG = sample_moment_extent_OG['max_x1_OG']
-    max_x2_OG = sample_moment_extent_OG['max_x2_OG']
+    max_x1_OG = moment_extent_OG['max_x1_OG']
+    max_x2_OG = moment_extent_OG['max_x2_OG']
 
-    # get variables
-    p1 = variables['p1']
-    p2 = variables['p2']
+    # slice variables to truncation
+    p1_slice = variables['p1'][0: max_x1_OG + 1]
+    p2_slice = variables['p2'][0: max_x2_OG + 1]
 
     # get capture efficiency moments
     E_beta = np.mean(beta)
     E_beta_sq = np.mean(beta**2)
 
     # expressions for moments (OG)
-    expr_E_x1 = gp.quicksum(p1 * np.arange(max_x1_OG + 1))
-    expr_E_x2 = gp.quicksum(p2 * np.arange(max_x2_OG + 1))
+    expr_E_x1 = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1))
+    expr_E_x2 = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1))
 
     # moment bounds (OB CI)
-    model.addConstr(expr_E_x1 <= sample_moments_OB['E_x1'][1] / E_beta, name="E_x1_UB")
-    model.addConstr(expr_E_x1 >= sample_moments_OB['E_x1'][0] / E_beta, name="E_x1_LB")
-    model.addConstr(expr_E_x2 <= sample_moments_OB['E_x2'][1] / E_beta, name="E_x2_UB")
-    model.addConstr(expr_E_x2 >= sample_moments_OB['E_x2'][0] / E_beta, name="E_x2_LB")
+    model.addConstr(expr_E_x1 <= moments_OB['E_x1'][1] / E_beta, name="E_x1_UB")
+    model.addConstr(expr_E_x1 >= moments_OB['E_x1'][0] / E_beta, name="E_x1_LB")
+    model.addConstr(expr_E_x2 <= moments_OB['E_x2'][1] / E_beta, name="E_x2_UB")
+    model.addConstr(expr_E_x2 >= moments_OB['E_x2'][0] / E_beta, name="E_x2_LB")
 
     # moment independence constraint
-    model.addConstr(expr_E_x1 * expr_E_x2 <= sample_moments_OB['E_x1_x2'][1] / E_beta_sq, name="Indep_UB")
-    model.addConstr(expr_E_x1 * expr_E_x2 >= sample_moments_OB['E_x1_x2'][0] / E_beta_sq, name="Indep_LB")
+    model.addConstr(expr_E_x1 * expr_E_x2 <= moments_OB['E_x1_x2'][1] / E_beta_sq, name="Indep_UB")
+    model.addConstr(expr_E_x1 * expr_E_x2 >= moments_OB['E_x1_x2'][0] / E_beta_sq, name="Indep_LB")
 
-def add_higher_moment_constraints(model, variables, sample_moment_extent_OG, sample_moments_OB, beta):
+def add_higher_moment_constraints(model, variables, moment_extent_OG, moments_OB, beta):
 
     # use extent of threshold truncation for OG states
-    max_x1_OG = sample_moment_extent_OG['max_x1_OG']
-    max_x2_OG = sample_moment_extent_OG['max_x2_OG']
+    max_x1_OG = moment_extent_OG['max_x1_OG']
+    max_x2_OG = moment_extent_OG['max_x2_OG']
 
-    # get variables
-    p1 = variables['p1']
-    p2 = variables['p2']
+    # slice variables to truncation
+    p1_slice = variables['p1'][0: max_x1_OG + 1]
+    p2_slice = variables['p2'][0: max_x2_OG + 1]
 
     # get capture efficiency moments
     E_beta = np.mean(beta)
     E_beta_sq = np.mean(beta**2)
 
     # expressions for moments (OG)
-    expr_E_x1_OG = gp.quicksum(p1 * np.arange(max_x1_OG + 1))
-    expr_E_x2_OG = gp.quicksum(p2 * np.arange(max_x2_OG + 1))
-    expr_E_x1_sq_OG = gp.quicksum(p1 * np.arange(max_x1_OG + 1)**2)
-    expr_E_x2_sq_OG = gp.quicksum(p2 * np.arange(max_x2_OG + 1)**2)
+    expr_E_x1_OG = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1))
+    expr_E_x2_OG = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1))
+    expr_E_x1_sq_OG = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1)**2)
+    expr_E_x2_sq_OG = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1)**2)
 
     # expressions for moments (OB)
     expr_E_x1_sq_OB = expr_E_x1_sq_OG*E_beta_sq + expr_E_x1_OG*(E_beta - E_beta_sq)
     expr_E_x2_sq_OB = expr_E_x2_sq_OG*E_beta_sq + expr_E_x2_OG*(E_beta - E_beta_sq)
 
     # moment bounds (OB CI)
-    model.addConstr(expr_E_x1_sq_OB <= sample_moments_OB['E_x1_sq'][1], name="E_x1_sq_UB")
-    model.addConstr(expr_E_x1_sq_OB >= sample_moments_OB['E_x1_sq'][0], name="E_x1_sq_LB")
-    model.addConstr(expr_E_x2_sq_OB <= sample_moments_OB['E_x2_sq'][1], name="E_x2_sq_UB")
-    model.addConstr(expr_E_x2_sq_OB >= sample_moments_OB['E_x2_sq'][0], name="E_x2_sq_LB")
+    model.addConstr(expr_E_x1_sq_OB <= moments_OB['E_x1_sq'][1], name="E_x1_sq_UB")
+    model.addConstr(expr_E_x1_sq_OB >= moments_OB['E_x1_sq'][0], name="E_x1_sq_LB")
+    model.addConstr(expr_E_x2_sq_OB <= moments_OB['E_x2_sq'][1], name="E_x2_sq_UB")
+    model.addConstr(expr_E_x2_sq_OB >= moments_OB['E_x2_sq'][0], name="E_x2_sq_LB")
 
-def add_CME_constraints(model, variables, sample_overall_extent_OG):
+def add_CME_constraints(model, variables, overall_extent_OG):
 
     # get extent of OG states
-    max_x1_OG = sample_overall_extent_OG['max_x1_OG']
-    max_x2_OG = sample_overall_extent_OG['max_x2_OG']
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
 
     # get variables
     p = variables['p']
@@ -213,11 +318,11 @@ def add_CME_constraints(model, variables, sample_overall_extent_OG):
         name="CME_x1_x2"
     )
 
-def add_marginal_CME_constraints(model, variables, sample_overall_extent_OG):
+def add_marginal_CME_constraints(model, variables, overall_extent_OG):
 
     # get extent of OG states
-    max_x1_OG = sample_overall_extent_OG['max_x1_OG']
-    max_x2_OG = sample_overall_extent_OG['max_x2_OG']
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
 
     # get variables
     p1 = variables['p1']
@@ -266,3 +371,4 @@ def add_factorization_constraints(model, variables):
 
     # equate dummy joint variable to product of marginals: all original states
     model.addConstr(p == outer, name=f"Joint_factorize")
+
