@@ -53,7 +53,7 @@ class Optimization():
         self.constraints = constraints
 
         # analysis settings
-        self.license_file = "D:/WLS_credentials.json"
+        self.license_file = "C:/WLS_credentials.json"
         self.time_limit = time_limit
         self.silent = silent
         self.K = K
@@ -92,8 +92,6 @@ class Optimization():
         Construct constraints of feasibility test for sample i and optimize.
         '''
 
-        s = time()
-        
         # if provided load WLS license credentials
         if self.license_file:
             environment_parameters = json.load(open(self.license_file))
@@ -114,26 +112,18 @@ class Optimization():
                 # set optimization parameters
                 model.Params.TimeLimit = self.time_limit
 
-                print(f"Model setup {time() - s}")
-
-                s = time()
                 # create variables
                 variables = constraints.add_variables(self, model, i)
-                print(f"Variables {time() - s}")
 
-                s = time()
                 # add constraints
                 constraints.add_constraints(self, model, variables, i)
-                print(f"Constraints {time() - s}")
                 
-                s = time()
                 # optimize: test feasibility
                 model.setObjective(0, GRB.MINIMIZE)
                 try:
                     model.optimize()
                 except gp.GurobiError:
                     print("GurobiError")
-                print(f"Optimization {time() - s}")
 
                 # collect solution information
                 solution = {

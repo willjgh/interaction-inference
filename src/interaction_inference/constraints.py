@@ -24,7 +24,7 @@ def add_variables(optimization, model, i):
     if "marginal_probability" in optimization.constraints:
         staged_variables.update(['p1', 'p2'])
     if "moment" in optimization.constraints:
-        staged_variables.update(['p1', 'p2'])
+        staged_variables.update(['p1', 'p2', 'E_x1', 'E_x2'])
     if "higher_moment" in optimization.constraints:
         staged_variables.update(['p1', 'p2'])
     if "CME" in optimization.constraints:
@@ -53,6 +53,10 @@ def add_variables(optimization, model, i):
         variables['k_deg_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_deg_1", lb=0, ub=optimization.K)
     if 'k_deg_2' in staged_variables:
         variables['k_deg_2'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_deg_2", lb=0, ub=optimization.K)
+    if 'E_x1' in staged_variables:
+        variables['E_x1'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x1")
+    if 'E_x2' in staged_variables:
+        variables['E_x2'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x2")
 
     return variables
 
@@ -84,8 +88,8 @@ def add_constraints(optimization, model, variables, i):
         add_moment_constraints(
             model,
             variables,
-            optimization.dataset.moments_OB[f'sample-{i}'],
             optimization.dataset.moment_extent_OG[f'sample-{i}'],
+            optimization.dataset.moments_OB[f'sample-{i}'],
             optimization.dataset.beta
         )
     if "higher_moment" in optimization.constraints:
@@ -202,11 +206,15 @@ def add_marginal_probability_constraints(model, variables, truncationM_OB, trunc
         model.addConstr(sum_expr >= x2_bounds[0, x2_OB], name=f"Bm_x2_lb_{x2_OB}")
         model.addConstr(sum_expr <= x2_bounds[1, x2_OB], name=f"Bm_x2_ub_{x2_OB}")
 
-def add_moment_constraints(model, variables, moments_OB, moment_extent_OG, beta):
+def add_moment_constraints(model, variables, moment_extent_OG, moments_OB, beta):
 
     # moment OG truncation for sample i
     max_x1_OG = moment_extent_OG['max_x1_OG']
     max_x2_OG = moment_extent_OG['max_x2_OG']
+
+    # get variables
+    E_x1 = variables['E_x1']
+    E_x2 = variables['E_x2']
 
     # slice variables to truncation
     p1_slice = variables['p1'][0: max_x1_OG + 1]
@@ -220,15 +228,19 @@ def add_moment_constraints(model, variables, moments_OB, moment_extent_OG, beta)
     expr_E_x1 = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1))
     expr_E_x2 = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1))
 
+    # equality constraints (OG)
+    model.addConstr(E_x1 == expr_E_x1, name="E_x1_equality")
+    model.addConstr(E_x2 == expr_E_x2, name="E_x2_equality")
+
     # moment bounds (OB CI)
-    model.addConstr(expr_E_x1 <= moments_OB['E_x1'][1] / E_beta, name="E_x1_UB")
-    model.addConstr(expr_E_x1 >= moments_OB['E_x1'][0] / E_beta, name="E_x1_LB")
-    model.addConstr(expr_E_x2 <= moments_OB['E_x2'][1] / E_beta, name="E_x2_UB")
-    model.addConstr(expr_E_x2 >= moments_OB['E_x2'][0] / E_beta, name="E_x2_LB")
+    model.addConstr(E_x1 <= moments_OB['E_x1'][1] / E_beta, name="E_x1_UB")
+    model.addConstr(E_x1 >= moments_OB['E_x1'][0] / E_beta, name="E_x1_LB")
+    model.addConstr(E_x2 <= moments_OB['E_x2'][1] / E_beta, name="E_x2_UB")
+    model.addConstr(E_x2 >= moments_OB['E_x2'][0] / E_beta, name="E_x2_LB")
 
     # moment independence constraint
-    model.addConstr(expr_E_x1 * expr_E_x2 <= moments_OB['E_x1_x2'][1] / E_beta_sq, name="Indep_UB")
-    model.addConstr(expr_E_x1 * expr_E_x2 >= moments_OB['E_x1_x2'][0] / E_beta_sq, name="Indep_LB")
+    model.addConstr(E_x1 * E_x2 <= moments_OB['E_x1_x2'][1] / E_beta_sq, name="Indep_UB")
+    model.addConstr(E_x1 * E_x2 >= moments_OB['E_x1_x2'][0] / E_beta_sq, name="Indep_LB")
 
 def add_higher_moment_constraints(model, variables, moment_extent_OG, moments_OB, beta):
 
