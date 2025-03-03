@@ -43,7 +43,7 @@ status_codes = {
 # ------------------------------------------------
 
 class Optimization():
-    def __init__(self, dataset, constraints, time_limit=300, silent=True, K=100, tqdm_disable=False, print_solution=True):
+    def __init__(self, dataset, constraints, license_file=None, time_limit=300, silent=True, K=100, tqdm_disable=False, print_solution=True):
         '''Initialize analysis settings and result storage.'''
         
         # store reference to dataset
@@ -53,7 +53,7 @@ class Optimization():
         self.constraints = constraints
 
         # analysis settings
-        self.license_file = "C:/WLS_credentials.json"
+        self.license_file = license_file
         self.time_limit = time_limit
         self.silent = silent
         self.K = K
