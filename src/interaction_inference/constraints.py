@@ -31,10 +31,14 @@ def add_variables(optimization, model, i):
         staged_variables.update(['p', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
     if "marginal_CME" in optimization.constraints:
         staged_variables.update(['p1', 'p2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+    if "marginal_CME_TE" in optimization.constraints:
+        staged_variables.update(['pg1', 'pg2', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
     if "base" in optimization.constraints:
         staged_variables.update(['p1', 'p2', 'k_deg_1', 'k_deg_2'])
     if "factorization" in optimization.constraints:
         staged_variables.update(['p', 'p1', 'p2'])
+    if "TE_equality" in optimization.constraints:
+        staged_variables.update(['p1', 'p2', 'pg1', 'pg2'])
 
     # variable dict
     variables = {}
@@ -43,8 +47,20 @@ def add_variables(optimization, model, i):
         variables['p1'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1), vtype=GRB.CONTINUOUS, name="p1", lb=0, ub=1)
     if 'p2' in staged_variables:
         variables['p2'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p2", lb=0, ub=1)
+    if 'pg1' in staged_variables:
+        variables['pg1'] = model.addMVar(shape=(2*(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1)), vtype=GRB.CONTINUOUS, name="pg1", lb=0, ub=1)
+    if 'pg2' in staged_variables:
+        variables['pg2'] = model.addMVar(shape=(2*(optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1)), vtype=GRB.CONTINUOUS, name="pg2", lb=0, ub=1)
     if 'p' in staged_variables:
         variables['p'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1, optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p", lb=0, ub=1)
+    if 'k_on_1' in staged_variables:
+        variables['k_on_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_on_1", lb=0, ub=optimization.K)
+    if 'k_on_2' in staged_variables:
+        variables['k_on_2'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_on_2", lb=0, ub=optimization.K)
+    if 'k_off_1' in staged_variables:
+        variables['k_off_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_off_1", lb=0, ub=optimization.K)
+    if 'k_off_2' in staged_variables:
+        variables['k_off_2'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_off_2", lb=0, ub=optimization.K)
     if 'k_tx_1' in staged_variables:
         variables['k_tx_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_tx_1", lb=0, ub=optimization.K)
     if 'k_tx_2' in staged_variables:
@@ -112,6 +128,12 @@ def add_constraints(optimization, model, variables, i):
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
         )
+    if "marginal_CME_TE" in optimization.constraints:
+        add_marginal_CME_TE_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
     if "base" in optimization.constraints:
         add_base_constraints(
             model,
@@ -121,6 +143,12 @@ def add_constraints(optimization, model, variables, i):
         add_factorization_constraints(
             model,
             variables
+        )
+    if "TE_equality" in optimization.constraints:
+        add_TE_equality_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
         )
 
 def add_probability_constraints(model, variables, truncation_OB, truncation_OG, i, dataset_name):
@@ -360,6 +388,75 @@ def add_marginal_CME_constraints(model, variables, overall_extent_OG):
         k_tx_2 * (Q_tx_2 @ p2) + k_deg_2 * (Q_deg_2 @ p2) == 0,
         name="Marginal_CME_x2"
     )
+
+def add_marginal_CME_TE_constraints(model, variables, overall_extent_OG):
+
+    # get extent of OG states
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
+
+    # get variables
+    pg1 = variables['pg1']
+    pg2 = variables['pg2']
+    k_on_1 = variables['k_on_1']
+    k_on_2 = variables['k_on_2']
+    k_off_1 = variables['k_off_1']
+    k_off_2 = variables['k_off_2']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_2']
+    k_deg_2 = variables['k_deg_1']
+
+    # variable sizes
+    N1 = 2*(max_x1_OG + 1)
+    N2 = 2*(max_x2_OG + 1)
+
+    # construct Q matrices
+    Q_on_1 = (np.diag([0 if x % 2 else -1 for x in range(N1)]) + np.diag([0 if x % 2 else 1 for x in range(N1 - 1)], -1))[:-2, :]
+    Q_on_2 = (np.diag([0 if x % 2 else -1 for x in range(N2)]) + np.diag([0 if x % 2 else 1 for x in range(N2 - 1)], -1))[:-2, :]
+
+    Q_off_1 = (np.diag([-1 if x % 2 else 0 for x in range(N1)]) + np.diag([0 if x % 2 else 1 for x in range(N1 - 1)], 1))[:-2, :]
+    Q_off_2 = (np.diag([-1 if x % 2 else 0 for x in range(N2)]) + np.diag([0 if x % 2 else 1 for x in range(N2 - 1)], 1))[:-2, :]
+
+    Q_tx_1 = (np.diag([-1 if x % 2 else 0 for x in range(N1)]) + np.diag([1 if x % 2 else 0 for x in range(N1 - 2)], -2))[:-2, :]
+    Q_tx_2 = (np.diag([-1 if x % 2 else 0 for x in range(N2)]) + np.diag([1 if x % 2 else 0 for x in range(N2 - 2)], -2))[:-2, :]
+
+    deg_diag_1 = np.array([(x // 2) for x in range(N1)])
+    deg_diag_2 = np.array([(x // 2) for x in range(N2)])
+
+    Q_deg_1 = (np.diag(-deg_diag_1) + np.diag(deg_diag_1[2:], 2))[:-2, ]
+    Q_deg_2 = (np.diag(-deg_diag_2) + np.diag(deg_diag_2[2:], 2))[:-2, ]
+
+    # add matrix constraints
+    model.addConstr(
+        k_on_1 * (Q_on_1 @ pg1) + k_off_1 * (Q_off_1 @ pg1) + k_tx_1 * (Q_tx_1 @ pg1) + k_deg_1 * (Q_deg_1 @ pg1) == 0,
+        name="Marginal_CME_x1"
+    )
+
+    model.addConstr(
+        k_on_2 * (Q_on_2 @ pg2) + k_off_2 * (Q_off_2 @ pg2) + k_tx_2 * (Q_tx_2 @ pg2) + k_deg_2 * (Q_deg_2 @ pg2) == 0,
+        name="Marginal_CME_x2"
+    )
+
+def add_TE_equality_constraints(model, variables, overall_extent_OG):
+
+    # use extent of threshold truncation for OG states
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
+
+    # get variables
+    p1 = variables['p1']
+    p2 = variables['p2']
+    pg1 = variables['pg1']
+    pg2 = variables['pg2']
+
+    # construct A matrices
+    A1 = np.repeat(np.eye(max_x1_OG + 1, dtype=int), repeats=2, axis=1)
+    A2 = np.repeat(np.eye(max_x2_OG + 1, dtype=int), repeats=2, axis=1)
+
+    # equate p1 and p2 to pg1 and pg2 sums
+    model.addConstr(p1 == A1 @ pg1)
+    model.addConstr(p2 == A2 @ pg2)
 
 def add_base_constraints(model, variables):
 
