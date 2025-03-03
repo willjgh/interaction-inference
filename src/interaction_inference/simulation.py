@@ -39,7 +39,120 @@ import tqdm
 # Gillespie simulation
 # ------------------------------------------------
 
-def gillespie(params, n, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
+def gillespie_telegraph(params, n, tmax=100, ts=10, plot=False, initial_state=(0, 0, 1, 1)):
+    '''
+    Simulate a sample path of telegraph regulation model.
+
+    Gillespie algorithm to simulate a sample path of the markov chain described by the
+    telegraph regulation stochastic reaction network model with given parameters. After a
+    burn-in time of 'tmax' samples are taken from the sample path at time intervals of 'ts'.
+    The states / samples are pairs of counts (x1, x2) from a pair of genes.
+
+    Args:
+
+    Returns:
+    '''
+
+    # initialize random generator
+    rng = np.random.default_rng()
+
+    # initialise time and state
+    t = 0
+    path = [initial_state]
+    jump_times = [0]
+
+    # simulate for burn-in time and time between n samples
+    while t < tmax + (n - 1) * ts:
+
+        # current state
+        x1, x2, g1, g2 = path[-1][0], path[-1][1], path[-1][2], path[-1][3]
+
+        # transition rates
+        q_on_1 = (1 - g1) * params['k_on_1']
+        q_on_2 = (1 - g2) * params['k_on_2']
+        q_off_1 = g1 * params['k_off_1']
+        q_off_2 = g2 * params['k_off_2']
+        q_tx_1 = g1 * params['k_tx_1']
+        q_tx_2 = g2 * params['k_tx_2']
+        q_deg_1 = x1 * params['k_deg_1']
+        q_deg_2 = x2 * params['k_deg_2']
+        q_reg = x1 * x2 * params['k_reg']
+        q_hold = q_on_1 + q_on_2 + q_off_1 + q_off_2 + q_tx_1 + q_tx_2 + \
+            q_deg_1 + q_deg_2 + q_reg
+
+        # holding time in current state
+        t_hold = -np.log(rng.uniform()) / q_hold
+        t += t_hold
+        jump_times.append(t)
+
+        # jump probability
+        outcome = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        prob = [
+            q_on_1 / q_hold,
+            q_on_2 / q_hold,
+            q_off_1 / q_hold,
+            q_off_2 / q_hold,
+            q_tx_1 / q_hold,
+            q_tx_2 / q_hold,
+            q_deg_1 / q_hold,
+            q_deg_2 / q_hold,
+            q_reg / q_hold
+        ]
+        jump = rng.choice(outcome, p=prob)
+        match jump:
+            case 1:
+                path.append((x1, x2, g1 + 1, g2))
+            case 2:
+                path.append((x1, x2, g1, g2 + 1))
+            case 3:
+                path.append((x1, x2, g1 - 1, g2))
+            case 4:
+                path.append((x1, x2, g1, g2 - 1))
+            case 5:
+                path.append((x1 + 1, x2, g1, g2))
+            case 6:
+                path.append((x1, x2 + 1, g1, g2))
+            case 7:
+                path.append((x1 - 1, x2, g1, g2))
+            case 8:
+                path.append((x1, x2 - 1, g1, g2))
+            case 9:
+                path.append((x1 - 1, x2 - 1, g1, g2))
+
+    # take the transcript states
+    x1_path = [state[0] for state in path]
+    x2_path = [state[1] for state in path]
+
+    # create step function of sample path from jump times and jump values
+    x1_path_function = scipy.interpolate.interp1d(jump_times, x1_path, kind='previous')
+    x2_path_function = scipy.interpolate.interp1d(jump_times, x2_path, kind='previous')
+
+    # take values at sampling times as samples from stationary dist
+    sample_times = [tmax + i * ts for i in range(n)]
+    x1_samples = x1_path_function(sample_times)
+    x2_samples = x2_path_function(sample_times)
+
+    # convert to integers
+    x1_samples = [int(x1) for x1 in x1_samples]
+    x2_samples = [int(x2) for x2 in x2_samples]
+
+    # re-combine to pairs of samples
+    samples = list(zip(x1_samples, x2_samples))
+
+    # plot sample paths
+    if plot:
+        x = np.linspace(0, tmax + (n - 1) * ts, 10000)
+        plt.plot(x, x1_path_function(x), label="X1 sample path", color="blue")
+        plt.plot(x, x2_path_function(x), label="X2 sample path", color="purple")
+        #plt.axvline(tmax, label="Burn-in time", color="orange")
+        plt.xlabel("Time")
+        plt.ylabel("# molcules")
+        plt.legend()
+        plt.show()
+
+    return samples
+
+def gillespie_birth_death(params, n, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
     '''
     Simulate a sample path of birth-death regulation model.
 
@@ -148,7 +261,7 @@ def gillespie(params, n, tmax=100, ts=10, plot=False, initial_state=(0, 0)):
 # Dataset simulation: interaction range
 # ------------------------------------------------
 
-def simulate_dataset_range(name, interaction_values, cells=1000, rate=1, tqdm_disable=True):
+def simulate_dataset_range_BD(name, interaction_values, cells=1000, rate=1, tqdm_disable=True):
     '''
     Produce a dataset of pairs of samples with fixed parameters (rate) over a
     range of interaction strength values.
@@ -194,7 +307,78 @@ def simulate_dataset_range(name, interaction_values, cells=1000, rate=1, tqdm_di
         }
 
         # simulate sample from model
-        sample = gillespie(params, cells)
+        sample = gillespie_birth_death(params, cells)
+
+        # store counts
+        counts_df.iloc[i] = sample
+
+    # construct dataset object
+    data = dataset.Dataset(name)
+
+    # store information
+    data.count_dataset = counts_df
+    data.param_dataset = params_df
+    data.cells = cells
+    data.gene_pairs = len(interaction_values)
+    data.beta = np.array([1.0 for j in range(cells)])
+
+    return data
+
+def simulate_dataset_range_TE(name, interaction_values, cells=1000, gene=0.5, rate=1, tqdm_disable=True):
+    '''
+    Produce a dataset of pairs of samples with fixed parameters (rate) over a
+    range of interaction strength values.
+
+    Args:
+        cells: number of samples to simulate per gene-pair
+        interaction_values: k_reg parameters values to simulate samples for
+        rate: k_tx parameter values for all genes
+
+    Returns:
+        Dataset instance containing information as attributes
+
+        params_df: pandas dataframe of model parameters per gene-pair
+        counts_df: pandas dataframe of sampled counts per gene-pair
+    '''
+
+    # number of pairs
+    gene_pairs = len(interaction_values)
+
+    # dataframes
+    params_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=['k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
+    counts_df = pd.DataFrame(index=[f"Gene-pair-{i}" for i in range(gene_pairs)], columns=[f"Cell-{j}" for j in range(cells)])
+
+    # for each gene
+    for i in tqdm.tqdm(range(gene_pairs), disable=tqdm_disable):
+
+        # Set reaction rate parameters
+        k_on_1 = gene
+        k_on_2 = gene
+        k_off_1 = 1 - gene
+        k_off_2 = 1 - gene
+        k_tx_1 = rate
+        k_tx_2 = rate
+        k_deg_1 = 1
+        k_deg_2 = 1
+        k_reg = interaction_values[i]
+
+        # store parameters
+        params_df.iloc[i] = [k_on_1, k_on_2, k_off_1, k_off_2, k_tx_1, k_tx_2, k_deg_1, k_deg_2, k_reg]
+
+        params = {
+            'k_on_1': k_on_1,
+            'k_on_2': k_on_2,
+            'k_off_1': k_off_1,
+            'k_off_2': k_off_2,
+            'k_tx_1': k_tx_1,
+            'k_tx_2': k_tx_2,
+            'k_deg_1': k_deg_1,
+            'k_deg_2': k_deg_2,
+            'k_reg': k_reg
+        }
+
+        # simulate sample from model
+        sample = gillespie_telegraph(params, cells)
 
         # store counts
         counts_df.iloc[i] = sample
@@ -319,7 +503,7 @@ def simulate_dataset_sampled(name, gene_pairs=100, cells=1000, interaction_chanc
         }
 
         # simulate sample from model
-        samples = gillespie(params, cells)
+        samples = gillespie_birth_death(params, cells)
 
         # store counts
         counts_df.iloc[i] = samples
