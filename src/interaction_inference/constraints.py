@@ -39,6 +39,8 @@ def add_variables(optimization, model, i):
         staged_variables.update(['p', 'p1', 'p2'])
     if "TE_equality" in optimization.constraints:
         staged_variables.update(['p1', 'p2', 'pg1', 'pg2'])
+    if "dummy_moment" in optimization.constraints:
+        staged_variables.update(['E_x1', 'E_x2'])
 
     # variable dict
     variables = {}
@@ -149,6 +151,13 @@ def add_constraints(optimization, model, variables, i):
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
+        )
+    if "dummy_moment" in optimization.constraints:
+        add_dummy_moment_constraints(
+            model,
+            variables,
+            optimization.dataset.moments_OB[f'sample-{i}'],
+            optimization.dataset.beta
         )
 
 def add_probability_constraints(model, variables, truncation_OB, truncation_OG, i, dataset_name):
@@ -481,3 +490,22 @@ def add_factorization_constraints(model, variables):
     # equate dummy joint variable to product of marginals: all original states
     model.addConstr(p == outer, name=f"Joint_factorize")
 
+def add_dummy_moment_constraints(model, variables, moments_OB, beta):
+
+    # get variables
+    E_x1 = variables['E_x1']
+    E_x2 = variables['E_x2']
+
+    # get capture efficiency moments
+    E_beta = np.mean(beta)
+    E_beta_sq = np.mean(beta**2)
+
+    # moment bounds (dummy variables)
+    model.addConstr(E_x1 <= moments_OB['E_x1'][1] / E_beta, name="E_x1_UB")
+    model.addConstr(E_x1 >= moments_OB['E_x1'][0] / E_beta, name="E_x1_LB")
+    model.addConstr(E_x2 <= moments_OB['E_x2'][1] / E_beta, name="E_x2_UB")
+    model.addConstr(E_x2 >= moments_OB['E_x2'][0] / E_beta, name="E_x2_LB")
+
+    # moment independence constraint (dummy variables)
+    model.addConstr(E_x1 * E_x2 <= moments_OB['E_x1_x2'][1] / E_beta_sq, name="Indep_UB")
+    model.addConstr(E_x1 * E_x2 >= moments_OB['E_x1_x2'][0] / E_beta_sq, name="Indep_LB")
