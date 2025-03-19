@@ -42,6 +42,19 @@ def add_variables(optimization, model, i):
     if "dummy_moment" in optimization.constraints:
         staged_variables.update(['E_x1', 'E_x2'])
 
+    if "downsampled_probability" in optimization.constraints:
+        staged_variables.update(['pd'])
+    if "downsampled_marginal_probability" in optimization.constraints:
+        staged_variables.update(['pd1', 'pd2'])
+    if "downsampled_CME" in optimization.constraints:
+        staged_variables.update(['pd', 'fm', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+    if "downsampled_marginal_CME" in optimization.constraints:
+        staged_variables.update(['pd1', 'pg2', 'fm1', 'fm2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+    if "downsampled_base" in optimization.constraints:
+        staged_variables.update(['pd', 'k_deg_1', 'k_deg_2'])
+    if "downsampled_marginal_base" in optimization.constraints:
+        staged_variables.update(['pd1', 'pd2', 'k_deg_1', 'k_deg_2'])
+
     # variable dict
     variables = {}
 
@@ -76,6 +89,19 @@ def add_variables(optimization, model, i):
     if 'E_x2' in staged_variables:
         variables['E_x2'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x2")
 
+    if 'pd1' in staged_variables:
+        variables['pd1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['max_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd1", lb=0, ub=1)
+    if 'pd2' in staged_variables:
+        variables['pd2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd2", lb=0, ub=1)
+    if 'pd' in staged_variables:
+        variables['pd'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd", lb=0, ub=1)
+    if 'fm1' in staged_variables:
+        variables['f1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['max_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm1", lb=0, ub=1)
+    if 'fm2' in staged_variables:
+        variables['f2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm2", lb=0, ub=1)
+    if 'fm' in staged_variables:
+        variables['f'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm", lb=0, ub=1)
+    
     return variables
 
 # ------------------------------------------------
@@ -158,6 +184,45 @@ def add_constraints(optimization, model, variables, i):
             variables,
             optimization.dataset.moments_OB[f'sample-{i}'],
             optimization.dataset.beta
+        )
+
+    if "downsampled_probability" in optimization.constraints:
+        add_downsampled_probability_constraints(
+            model,
+            variables,
+            optimization.dataset.probs_OB[f'sample-{i}'],
+            optimization.dataset.truncation_OB[f'sample-{i}']
+        )
+    if "downsampled_marginal_probability" in optimization.constraints:
+        add_downsampled_marginal_probability_constraints(
+            model,
+            variables,
+            optimization.dataset.probs_OB[f'sample-{i}'],
+            optimization.dataset.truncationM_OB[f'sample-{i}']
+        )
+    if "downsampled_CME" in optimization.constraints:
+        add_downsampled_CME_constraints(
+            model,
+            variables,
+            optimization.dataset.fm_OB[f'sample-{i}'],
+            optimization.dataset.truncation_OB[f'sample-{i}']
+        )
+    if "downsampled_marginal_CME" in optimization.constraints:
+        add_downsampled_marginal_CME_constraints(
+            model,
+            variables,
+            optimization.dataset.fm_OB[f'sample-{i}'],
+            optimization.dataset.trunactionM_OB[f'sample-{i}']
+        )
+    if "downsampled_base" in optimization.constraints:
+        add_downsampled_base_constraints(
+            model,
+            variables
+        )
+    if "downsampled_marginal_base" in optimization.constraints:
+        add_downsampled_marginal_base_constraints(
+            model,
+            variables
         )
 
 def add_probability_constraints(model, variables, probs_OB, truncation_OB, truncation_OG, dataset_name):
@@ -509,3 +574,190 @@ def add_dummy_moment_constraints(model, variables, moments_OB, beta):
     # moment independence constraint (dummy variables)
     model.addConstr(E_x1 * E_x2 <= moments_OB['E_x1_x2'][1] / E_beta_sq, name="Indep_UB")
     model.addConstr(E_x1 * E_x2 >= moments_OB['E_x1_x2'][0] / E_beta_sq, name="Indep_LB")
+
+# ------------------------------------------------
+# Downsampled constraints
+# ------------------------------------------------
+
+def add_downsampled_probability_constraints(model, variables, probs_OB, truncation_OB):
+
+    # get OB truncation for sample i
+    # min_x1_OB = truncation_OB['min_x1_OB']
+    max_x1_OB = truncation_OB['max_x1_OB']
+    # min_x2_OB = truncation_OB['min_x2_OB']
+    max_x2_OB = truncation_OB['max_x2_OB']
+
+    # NOTE: currently only using upper truncation boundary
+
+    # get variables
+    pd = variables['pd']
+
+    # CI bounds
+    model.addConstr(pd <= probs_OB['bounds'][1, :max_x1_OB + 1, :max_x2_OB + 1], name="pd_UB")
+    model.addConstr(pd >= probs_OB['bounds'][0, :max_x1_OB + 1, :max_x2_OB + 1], name="pd_LB")
+
+def add_downsampled_marginal_probability_constraints(model, variables, probs_OB, truncationM_OB):
+
+    # get OB truncation for sample i
+    # min_x1_OB = truncationM_OB['min_x1_OB']
+    max_x1_OB = truncationM_OB['max_x1_OB']
+    # min_x2_OB = truncationM_OB['min_x2_OB']
+    max_x2_OB = truncationM_OB['max_x2_OB']
+
+    # NOTE: currently only using upper truncation boundary
+
+    # get variables
+    pd1 = variables['pd1']
+    pd2 = variables['pd2']
+
+    # CI bounds
+    model.addConstr(pd1 <= probs_OB['x1_bounds'][1, :max_x1_OB + 1], name="pd1_UB")
+    model.addConstr(pd1 >= probs_OB['x1_bounds'][0, :max_x1_OB + 1], name="pd1_LB")
+    model.addConstr(pd2 <= probs_OB['x2_bounds'][1, :max_x2_OB + 1], name="pd2_UB")
+    model.addConstr(pd2 >= probs_OB['x2_bounds'][0, :max_x2_OB + 1], name="pd2_LB")
+
+def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
+
+    # get OB truncation for sample i 
+    max_x1_OB = truncation_OB['max_x1_OB']
+    max_x2_OB = truncation_OB['max_x2_OB']
+
+    # get variables
+    pd = variables['pd']
+    fm = variables['fm']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_2']
+    k_deg_2 = variables['k_deg_1']
+
+    # fm rate bounds
+    model.addConstr(fm <= fm_OB['fm1m2'][1, :max_x1_OB + 1, :max_x2_OB + 1], name="fm_UB")
+    model.addConstr(fm >= fm_OB['fm1m2'][0, :max_x1_OB + 1, :max_x2_OB + 1], name="fm_LB")
+
+    # dummy zero variable for non-linear constraints
+    z = model.addVar()
+    model.addConstr(z == 0)
+    
+    # manually add x1_OB = x2_OB = 0 constraint (to avoid pd1(-1), pd2(-1) terms)
+    model.addConstr(
+        z == k_deg_1 * pd[1, 0] + \
+        k_deg_2 * pd[0, 1] - \
+        (k_tx_1 + k_tx_2) * pd[0, 0],
+        name="CME_d_0_0"
+    )
+
+    # manually add x1_OB = 0 constraints (to avoid pd1(-1) terms)
+    model.addConstrs(
+        (
+            z == k_tx_2 * fm[0, x2_OB - 1] * pd[0, x2_OB - 1] + \
+            k_deg_1 * pd[1, x2_OB] + \
+            k_deg_2 * (x2_OB + 1) * pd[0, x2_OB + 1] - \
+            (k_tx_1 * fm[0, x2_OB] + k_tx_2 * fm[0, x2_OB] + k_deg_2 * x2_OB) * pd[0, x2_OB]
+            for x2_OB in range(1, max_x2_OB)
+        ),
+        name="CME_d_0_x2"
+    )
+    # manually add x2_OB = 0 constraints (to avoid pd2(-1) terms)
+    model.addConstrs(
+        (
+            z == k_tx_1 * fm[x1_OB - 1, 0] * pd[x1_OB - 1, 0] + \
+            k_deg_1 * (x1_OB + 1) * pd[x1_OB + 1, 0] + \
+            k_deg_2 * pd[x1_OB, 1] - \
+            (k_tx_1 * fm[x1_OB, 0] + k_tx_2 * fm[x1_OB, 0] + k_deg_1 * x1_OB) * pd[x1_OB, 0]
+            for x1_OB in range(1, max_x1_OB)
+        ),
+        name="CME_d_x1_0"
+    )
+
+    # add CME constraints
+    model.addConstrs(
+        (
+            z == k_tx_1 * fm[x1_OB - 1, x2_OB] * pd[x1_OB - 1, x2_OB] + \
+            k_tx_2 * fm[x1_OB, x2_OB - 1] * pd[x1_OB, x2_OB - 1] + \
+            k_deg_1 * (x1_OB + 1) * pd[x1_OB + 1, x2_OB] + \
+            k_deg_2 * (x2_OB + 1) * pd[x1_OB, x2_OB + 1] - \
+            (k_tx_1 * fm[x1_OB, x2_OB] + k_tx_2 * fm[x1_OB, x2_OB] + k_deg_1 * x1_OB + k_deg_2 * x2_OB) * pd[x1_OB, x2_OB]
+            for x1_OB in range(1, max_x1_OB)
+            for x2_OB in range(1, max_x2_OB)
+        ),
+        name="CME_d_x1_x2"
+    )
+
+def add_downsampled_marginal_CME_constraints(model, variables, fm_OB, truncationM_OB):
+
+    # get OB truncation for sample i 
+    max_x1_OB = truncationM_OB['max_x1_OB']
+    max_x2_OB = truncationM_OB['max_x2_OB']
+
+    # get variables
+    pd1 = variables['pd1']
+    pd2 = variables['pd2']
+    fm1 = variables['fm1']
+    fm2 = variables['fm2']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_2']
+    k_deg_2 = variables['k_deg_1']
+
+    # fm rate bounds
+    model.addConstr(fm1 <= fm_OB['fm1'][1, :max_x1_OB + 1], name="fm1_UB")
+    model.addConstr(fm1 >= fm_OB['fm1'][0, :max_x1_OB + 1], name="fm1_LB")
+    model.addConstr(fm2 <= fm_OB['fm2'][1, :max_x2_OB + 1], name="fm2_UB")
+    model.addConstr(fm2 >= fm_OB['fm2'][0, :max_x2_OB + 1], name="fm2_LB")
+
+    # dummy zero variable for non-linear constraints
+    z = model.addVar()
+    model.addConstr(z == 0)
+
+    # manually add x1_OB = 0 constraint (to avoid pd1(-1))
+    model.addConstr(
+        z == k_deg_1 * pd1[1] - k_tx_1 * fm1[0] * pd1[0],
+        name="CME_d_x1_0"
+    )
+
+    # x1_OB CME
+    model.addConstrs(
+        (
+            z == k_tx_1 * fm1[x1_OB - 1] * pd1[x1_OB - 1] + \
+            k_deg_1 * (x1_OB + 1) * pd1[x1_OB + 1] - \
+            (k_tx_1 * fm1[x1_OB] + k_deg_1 * x1_OB) * pd1[x1_OB]
+            for x1_OB in range(1, max_x1_OB)
+        ),
+        name="CME_d_x1"
+    )
+
+    # manually add x2_OB = 0 constraint (to avoid pd2(-1))
+    model.addConstr(
+        z == k_deg_2 * pd2[1] - k_tx_2 * fm2[0] * pd2[0],
+        name="CME_d_x2_0"
+    )
+
+    # x2_OB CME
+    model.addConstrs(
+        (
+            z == k_tx_2 * fm2[x2_OB - 1] * pd2[x2_OB - 1] + \
+            k_deg_2 * (x2_OB + 1) * pd2[x2_OB + 1] - \
+            (k_tx_2 * fm2[x2_OB] + k_deg_2 * x2_OB) * pd2[x2_OB]
+            for x2_OB in range(1, max_x2_OB)
+        ),
+        name="CME_d_x1"
+    )
+
+def add_downsampled_base_constraints(model, variables):
+
+    # fix k_deg_1 = 1, k_deg = 2 for identifiability
+    model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
+    model.addConstr(variables['k_deg_2'] == 1, name="Fix_k_deg_2")
+
+    # distributional constraints
+    model.addConstr(variables['pd'].sum() <= 1, name="Dist_pd")
+
+def add_downsampled_marginal_base_constraints(model, variables):
+
+    # fix k_deg_1 = 1, k_deg = 2 for identifiability
+    model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
+    model.addConstr(variables['k_deg_2'] == 1, name="Fix_k_deg_2")
+
+    # distributional constraints
+    model.addConstr(variables['pd1'].sum() <= 1, name="Dist_pd1")
+    model.addConstr(variables['pd2'].sum() <= 1, name="Dist_pd2")    
