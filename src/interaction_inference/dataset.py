@@ -48,6 +48,9 @@ class Dataset():
         self.truncationM_OB = None
         self.truncation_OG = None
 
+        # f bounds
+        self.fs_OB = None
+
         # moment bounds
         self.moments_OB = None
         self.moment_extent_OG = None
@@ -130,10 +133,55 @@ class Dataset():
         downsampled_dataset.gene_pairs = self.gene_pairs
 
         return downsampled_dataset
+    
+    def compute_f(self, tqdm_disable=True):
+        '''
+        For each sample in dataset compute bootstrap CI bounds on fm = E[beta|m]
+        rates and compute observed truncation information, storing this in
+        attributes of the dataset.
+        '''
+
+        # collect OB truncations
+        truncation_dict = {}
+        truncationM_dict = {}
+
+        # collect CI bounds
+        fs_dict = {}
+
+        # loop over samples
+        for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
+
+            # select sample
+            sample = list(self.count_dataset.loc[f'Gene-pair-{i}'])
+
+            # bootstrap fs
+            fs_results = bootstrap.bootstrap_f(
+                sample,
+                self.beta,
+                self.resamples,
+                self.thresh_OB,
+                self.threshM_OB
+            )
+
+            # store OB truncation
+            truncation_dict[f'sample-{i}'] = fs_results['truncation_OB']
+            truncationM_dict[f'sample-{i}'] = fs_results['truncationM_OB']
+
+            # store CI bounds
+            fs_dict[f'sample-{i}'] = {
+                'fm1m2': fs_results['fm1m2'],
+                'fm1': fs_results['fm1'],
+                'fm2': fs_results['fm2']
+            }
+
+        # store information
+        self.truncation_OB = truncation_dict
+        self.truncationM_OB = truncationM_dict
+        self.fs_OB = fs_dict
  
     def compute_moments(self, tqdm_disable=True):
         '''
-        For each over samples in dataset compute bootstrap CI bounds on moments
+        For each sample in dataset compute bootstrap CI bounds on moments
         and compute original truncation information, storing this in attributes
         of the dataset.
         '''
@@ -169,7 +217,7 @@ class Dataset():
 
     def bootstrap_probabilities(self, tqdm_disable=True):
         '''
-        For each over samples in dataset compute bootstrap CI bounds on joint and
+        For each sample in dataset compute bootstrap CI bounds on joint and
         marginal probabilities as well as observed truncation information,
         storing this in attributes of the dataset.
 
