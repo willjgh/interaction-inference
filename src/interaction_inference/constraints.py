@@ -90,17 +90,17 @@ def add_variables(optimization, model, i):
         variables['E_x2'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x2")
 
     if 'pd1' in staged_variables:
-        variables['pd1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['max_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd1", lb=0, ub=1)
+        variables['pd1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd1", lb=0, ub=1)
     if 'pd2' in staged_variables:
-        variables['pd2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd2", lb=0, ub=1)
+        variables['pd2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd2", lb=0, ub=1)
     if 'pd' in staged_variables:
         variables['pd'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd", lb=0, ub=1)
     if 'fm1' in staged_variables:
-        variables['f1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['max_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm1", lb=0, ub=1)
+        variables['fm1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm1", lb=0, ub=1)
     if 'fm2' in staged_variables:
-        variables['f2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm2", lb=0, ub=1)
+        variables['fm2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm2", lb=0, ub=1)
     if 'fm' in staged_variables:
-        variables['f'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm", lb=0, ub=1)
+        variables['fm'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm", lb=0, ub=1)
     
     return variables
 
@@ -212,7 +212,7 @@ def add_constraints(optimization, model, variables, i):
             model,
             variables,
             optimization.dataset.fm_OB[f'sample-{i}'],
-            optimization.dataset.trunactionM_OB[f'sample-{i}']
+            optimization.dataset.truncationM_OB[f'sample-{i}']
         )
     if "downsampled_base" in optimization.constraints:
         add_downsampled_base_constraints(
@@ -600,9 +600,9 @@ def add_downsampled_marginal_probability_constraints(model, variables, probs_OB,
 
     # get OB truncation for sample i
     # min_x1_OB = truncationM_OB['min_x1_OB']
-    max_x1_OB = truncationM_OB['max_x1_OB']
+    max_x1_OB = truncationM_OB['maxM_x1_OB']
     # min_x2_OB = truncationM_OB['min_x2_OB']
-    max_x2_OB = truncationM_OB['max_x2_OB']
+    max_x2_OB = truncationM_OB['maxM_x2_OB']
 
     # NOTE: currently only using upper truncation boundary
 
@@ -686,8 +686,8 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
 def add_downsampled_marginal_CME_constraints(model, variables, fm_OB, truncationM_OB):
 
     # get OB truncation for sample i 
-    max_x1_OB = truncationM_OB['max_x1_OB']
-    max_x2_OB = truncationM_OB['max_x2_OB']
+    max_x1_OB = truncationM_OB['maxM_x1_OB']
+    max_x2_OB = truncationM_OB['maxM_x2_OB']
 
     # get variables
     pd1 = variables['pd1']
