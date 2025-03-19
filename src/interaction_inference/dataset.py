@@ -211,18 +211,18 @@ class Dataset():
 
             # OR:
             # save CI bounds
-            np.save(
-                f"./Temp/Bounds/Joint/{self.name}-sample-{i}.npy",
-                prob_results['bounds']
-            )
-            np.save(
-                f"./Temp/Bounds/x1_marginal/{self.name}-sample-{i}.npy",
-                prob_results['x1_bounds']
-            )
-            np.save(
-                f"./Temp/Bounds/x2_marginal/{self.name}-sample-{i}.npy",
-                prob_results['x2_bounds']
-            )
+            #np.save(
+            #    f"./Temp/Bounds/Joint/{self.name}-sample-{i}.npy",
+            #    prob_results['bounds']
+            #)
+            #np.save(
+            #    f"./Temp/Bounds/x1_marginal/{self.name}-sample-{i}.npy",
+            #    prob_results['x1_bounds']
+            #)
+            #np.save(
+            #    f"./Temp/Bounds/x2_marginal/{self.name}-sample-{i}.npy",
+            #    prob_results['x2_bounds']
+            #)
 
         # store information
         self.truncation_OB = truncation_dict
