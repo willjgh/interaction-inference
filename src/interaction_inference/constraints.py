@@ -88,18 +88,18 @@ def add_constraints(optimization, model, variables, i):
         add_probability_constraints(
             model,
             variables,
+            optimization.dataset.probs_OB[f'sample-{i}'],
             optimization.dataset.truncation_OB[f'sample-{i}'],
             optimization.dataset.truncation_OG,
-            i,
             optimization.dataset.name
         )
     if "marginal_probability" in optimization.constraints:
         add_marginal_probability_constraints(
             model,
             variables,
+            optimization.dataset.probs_OB[f'sample-{i}'],
             optimization.dataset.truncationM_OB[f'sample-{i}'],
             optimization.dataset.truncation_OG,
-            i,
             optimization.dataset.name
         )
     if "moment" in optimization.constraints:
@@ -160,7 +160,7 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.beta
         )
 
-def add_probability_constraints(model, variables, truncation_OB, truncation_OG, i, dataset_name):
+def add_probability_constraints(model, variables, probs_OB, truncation_OB, truncation_OG, dataset_name):
 
     # get OB truncation for sample i
     min_x1_OB = truncation_OB['min_x1_OB']
@@ -169,7 +169,7 @@ def add_probability_constraints(model, variables, truncation_OB, truncation_OG, 
     max_x2_OB = truncation_OB['max_x2_OB']
 
     # load CI bounds for sample i
-    bounds = np.load(f"./Temp/Bounds/Joint/{dataset_name}-sample-{i}.npy")
+    # bounds = np.load(f"./Temp/Bounds/Joint/{dataset_name}-sample-{i}.npy")
             
     # for each OB state pair in truncation
     for x1_OB in range(min_x1_OB, max_x1_OB + 1):
@@ -190,10 +190,10 @@ def add_probability_constraints(model, variables, truncation_OB, truncation_OG, 
             sum_expr = p1_slice.T @ B_coeffs @ p2_slice
         
             # form constraints using CI bounds
-            model.addConstr(sum_expr >= bounds[0, x1_OB, x2_OB], name=f"B_lb_{x1_OB}_{x2_OB}")
-            model.addConstr(sum_expr <= bounds[1, x1_OB, x2_OB], name=f"B_ub_{x1_OB}_{x2_OB}")
+            model.addConstr(sum_expr >= probs_OB['bounds'][0, x1_OB, x2_OB], name=f"B_lb_{x1_OB}_{x2_OB}")
+            model.addConstr(sum_expr <= probs_OB['bounds'][1, x1_OB, x2_OB], name=f"B_ub_{x1_OB}_{x2_OB}")
 
-def add_marginal_probability_constraints(model, variables, truncationM_OB, truncation_OG, i, dataset_name):
+def add_marginal_probability_constraints(model, variables, probs_OB, truncationM_OB, truncation_OG, dataset_name):
 
     # get marginal OB truncation for sample i
     minM_x1_OB = truncationM_OB['minM_x1_OB']
@@ -202,8 +202,8 @@ def add_marginal_probability_constraints(model, variables, truncationM_OB, trunc
     maxM_x2_OB = truncationM_OB['maxM_x2_OB']
 
     # load CI bounds for sample i
-    x1_bounds = np.load(f"./Temp/Bounds/x1_marginal/{dataset_name}-sample-{i}.npy")
-    x2_bounds = np.load(f"./Temp/Bounds/x2_marginal/{dataset_name}-sample-{i}.npy")
+    #x1_bounds = np.load(f"./Temp/Bounds/x1_marginal/{dataset_name}-sample-{i}.npy")
+    #x2_bounds = np.load(f"./Temp/Bounds/x2_marginal/{dataset_name}-sample-{i}.npy")
 
     # for each OB state in truncation
     for x1_OB in range(minM_x1_OB, maxM_x1_OB + 1):
@@ -221,8 +221,8 @@ def add_marginal_probability_constraints(model, variables, truncationM_OB, trunc
         sum_expr = gp.quicksum(Bm_coeffs * p1_slice)
 
         # form constraints using CI bounds
-        model.addConstr(sum_expr >= x1_bounds[0, x1_OB], name=f"Bm_x1_lb_{x1_OB}")
-        model.addConstr(sum_expr <= x1_bounds[1, x1_OB], name=f"Bm_x1_ub_{x1_OB}")
+        model.addConstr(sum_expr >= probs_OB['x1_bounds'][0, x1_OB], name=f"Bm_x1_lb_{x1_OB}")
+        model.addConstr(sum_expr <= probs_OB['x1_bounds'][1, x1_OB], name=f"Bm_x1_ub_{x1_OB}")
 
     # repeat for x2
     for x2_OB in range(minM_x2_OB, maxM_x2_OB + 1):
@@ -240,8 +240,8 @@ def add_marginal_probability_constraints(model, variables, truncationM_OB, trunc
         sum_expr = gp.quicksum(Bm_coeffs * p2_slice)
 
         # form constraints using CI bounds
-        model.addConstr(sum_expr >= x2_bounds[0, x2_OB], name=f"Bm_x2_lb_{x2_OB}")
-        model.addConstr(sum_expr <= x2_bounds[1, x2_OB], name=f"Bm_x2_ub_{x2_OB}")
+        model.addConstr(sum_expr >= probs_OB['x2_bounds'][0, x2_OB], name=f"Bm_x2_lb_{x2_OB}")
+        model.addConstr(sum_expr <= probs_OB['x2_bounds'][1, x2_OB], name=f"Bm_x2_ub_{x2_OB}")
 
 def add_moment_constraints(model, variables, moment_extent_OG, moments_OB, beta):
 
