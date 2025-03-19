@@ -23,10 +23,10 @@ import matplotlib.pyplot as plt
 from ast import literal_eval
 
 # ------------------------------------------------
-# Bootstrap f's
+# Bootstrap fm's
 # ------------------------------------------------
 
-def bootstrap_f(sample, beta, resamples=None, thresh_OB=10, threshM_OB=10, printing=False):
+def bootstrap_fm(sample, beta, resamples=None, thresh_OB=10, threshM_OB=10, printing=False):
 
     # get sample size
     n = len(sample)
