@@ -23,6 +23,233 @@ import matplotlib.pyplot as plt
 from ast import literal_eval
 
 # ------------------------------------------------
+# Bootstrap f's
+# ------------------------------------------------
+
+def bootstrap_f(sample, beta, resamples=None, thresh_OB=10, threshM_OB=10, printing=False):
+
+    # get sample size
+    n = len(sample)
+
+    # get bootstrap size: default to sample size
+    if resamples is None:
+        resamples = n
+
+    # initialize random generator
+    rng = np.random.default_rng()
+
+    # convert string to tuple if neccessary (pandas reading csv to string)
+    if type(sample[0]) == str:
+        sample = [literal_eval(count_pair) for count_pair in sample]
+
+    # compute maximum x1 and x2 values
+    M, N = np.max(sample, axis=0)
+    M, N = int(M), int(N)
+
+    # map (x1, x2) pairs to integers: x2 + (N + 1) * x1
+    integer_sample = np.array([x[1] + (N + 1)*x[0] for x in sample], dtype='uint32')
+
+    # maxiumum of integer sample
+    D = (M + 1)*(N + 1) - 1
+
+    # setup f arrays
+    fm1m2 = np.zeros((2, M + 1, N + 1))
+    fm1 = np.zeros((2, M + 1))
+    fm2 = np.zeros((2, N + 1))
+
+    # loop over states
+    for m1 in range(M + 1):
+        for m2 in range(N + 1):
+
+            # capture for cells with counts (m1, m2)
+            beta_m = beta[(sample == np.array([m1, m2])).sum(axis=1) == 2]
+
+            # if empty
+            if beta_m.size == 0:
+                
+                # store [0, 1] bounds
+                fm1m2[:, m1, m2] = [0.0, 1.0]
+
+                # move to next pair
+                continue
+
+            # bootstrap resample
+            boot = rng.choice(beta_m, size=(resamples, len(beta_m)))
+
+            # estimate E[beta|(m1, m2)]
+            estimates = boot.mean(axis=1)
+
+            # quantile for confidence intervals
+            interval = np.quantile(estimates, [0.025, 0.975], axis=0)
+
+            # store
+            fm1m2[:, m1, m2] = interval
+
+    # marginals
+    x1_sample = np.array([x[0] for x in sample])
+    x2_sample = np.array([x[1] for x in sample])
+
+    for m1 in range(M + 1):
+
+        # capture for cells with count m1
+        beta_m = beta[x1_sample == m1]
+
+        # if empty
+        if beta_m.size == 0:
+            
+            # store [0, 1] bounds
+            fm1[:, m1] = [0.0, 1.0]
+
+            # move to next pair
+            continue
+
+        # bootstrap resample
+        boot = rng.choice(beta_m, size=(resamples, len(beta_m)))
+
+        # estimate E[beta|m]
+        estimates = boot.mean(axis=1)
+
+        # quantile for confidence intervals
+        interval = np.quantile(estimates, [0.025, 0.975], axis=0)
+
+        # store
+        fm1[:, m1] = interval
+
+    for m2 in range(N + 1):
+
+        # capture for cells with count m2
+        beta_m = beta[x2_sample == m2]
+
+        # if empty
+        if beta_m.size == 0:
+            
+            # store [0, 1] bounds
+            fm2[:, m2] = [0.0, 1.0]
+
+            # move to next pair
+            continue
+
+        # bootstrap resample
+        boot = rng.choice(beta_m, size=(resamples, len(beta_m)))
+
+        # estimate E[beta|m]
+        estimates = boot.mean(axis=1)
+
+        # quantile for confidence intervals
+        interval = np.quantile(estimates, [0.025, 0.975], axis=0)
+
+        # store
+        fm2[:, m2] = interval
+
+    # count occurances per (x1, x2) in the in original sample
+    sample_counts = np.bincount(integer_sample, minlength=D + 1).reshape(M + 1, N + 1)
+
+    # sum over columns / rows to give counts per x1 / x2 state
+    x1_sample_counts = sample_counts.sum(axis=1)
+    x2_sample_counts = sample_counts.sum(axis=0)
+    
+    # set truncation bounds
+    min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = M, 0, N, 0
+    minM_x1_OB, maxM_x1_OB = M, 0
+    minM_x2_OB, maxM_x2_OB = N, 0
+
+    # set flag for changes
+    thresh_flag = False
+    thresh_flag_x1 = False
+    thresh_flag_x2 = False
+
+    # replace CI's for states below threshold occurances by [0, 1] bounds
+    for x1 in range(M + 1):
+        for x2 in range(N + 1):
+            # below: replace
+            if sample_counts[x1, x2] < thresh_OB:
+                fm1m2[:, x1, x2] = [0.0, 1.0]
+            # above: update truncation
+            else:
+                # check if smaller than current min
+                if x1 < min_x1_OB:
+                    min_x1_OB = x1
+                    thresh_flag = True
+                if x2 < min_x2_OB:
+                    min_x2_OB = x2
+                    thresh_flag = True
+                # check if larger than current max
+                if x1 > max_x1_OB:
+                    max_x1_OB = x1
+                    thresh_flag = True
+                if x2 > max_x2_OB:
+                    max_x2_OB = x2
+                    thresh_flag = True
+
+    for x1 in range(M + 1):
+        # below: replace
+        if x1_sample_counts[x1] < threshM_OB:
+            fm1[:, x1] = [0.0, 1.0]
+        # above: update truncation
+        else:
+            # check if smaller than current min
+            if x1 < minM_x1_OB:
+                minM_x1_OB = x1
+                thresh_flag_x1 = True
+            # check if larger than current max
+            if x1 > maxM_x1_OB:
+                maxM_x1_OB = x1
+                thresh_flag_x1 = True
+
+    for x2 in range(N + 1):
+        # below: replace
+        if x2_sample_counts[x2] < threshM_OB:
+            fm2[:, x2] = [0.0, 1.0]
+        # above: update truncation
+        else:
+            # check if smaller than current min
+            if x2 < minM_x2_OB:
+                minM_x2_OB = x2
+                thresh_flag_x2 = True
+            # check if larger than current max
+            if x2 > maxM_x2_OB:
+                maxM_x2_OB = x2
+                thresh_flag_x2 = True
+
+    # if no states were above threshold: default to max range, report
+    if not thresh_flag:
+        min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = 0, M, 0, N
+    if not thresh_flag_x1:
+        minM_x1_OB, maxM_x1_OB = 0, M
+    if not thresh_flag_x2:
+        minM_x2_OB, maxM_x2_OB = 0, N
+
+    # printing
+    if printing:
+        print(f"Box truncation: [{min_x1_OB}, {max_x1_OB}] x [{min_x2_OB}, {max_x2_OB}]")
+        print(f"Marginal x1 truncation: [{minM_x1_OB}, {maxM_x1_OB}]")
+        print(f"Marginal x2 truncation: [{minM_x2_OB}, {maxM_x2_OB}]")
+
+    # collect results
+    truncation_OB = {
+        'min_x1_OB': min_x1_OB,
+        'max_x1_OB': max_x1_OB,
+        'min_x2_OB': min_x2_OB,
+        'max_x2_OB': max_x2_OB
+    }
+    truncationM_OB = {
+        'minM_x1_OB': minM_x1_OB,
+        'maxM_x1_OB': maxM_x1_OB,
+        'minM_x2_OB': minM_x2_OB,
+        'maxM_x2_OB': maxM_x2_OB
+    }
+
+    result_dict = {
+        'fm1m2': fm1m2,
+        'fm1': fm1,
+        'fm2': fm2,
+        'truncation_OB': truncation_OB,
+        'truncationM_OB': truncationM_OB
+    }
+
+    return result_dict
+
+# ------------------------------------------------
 # Bootstrap moments
 # ------------------------------------------------
 
