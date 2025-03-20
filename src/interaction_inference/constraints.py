@@ -642,7 +642,7 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
     model.addConstr(
         z == k_deg_1 * pd[1, 0] + \
         k_deg_2 * pd[0, 1] - \
-        (k_tx_1 + k_tx_2) * pd[0, 0],
+        (k_tx_1 * fm[0, 0] + k_tx_2 * fm[0, 0]) * pd[0, 0],
         name="CME_d_0_0"
     )
 
