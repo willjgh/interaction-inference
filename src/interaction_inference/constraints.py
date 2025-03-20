@@ -19,35 +19,59 @@ def add_variables(optimization, model, i):
     # stage variables to be added
     staged_variables = set()
 
+    # base constraints
+    if "k_deg_1" in optimization.constraints:
+        staged_variables.update(['k_deg_1'])
+    if "k_deg_2" in optimization.constraints:
+        staged_variables.update(['k_deg_2'])
+    if "k_reg" in optimization.constraints:
+        staged_variables.update(['k_reg'])
+
+    # B method birth-death constraints
+    if "factorization" in optimization.constraints:
+        staged_variables.update(['p', 'p1', 'p2'])
+    if "joint_probability" in optimization.constraints:
+        staged_variables.update(['p'])
     if "probability" in optimization.constraints:
         staged_variables.update(['p1', 'p2'])
-    if "marginal_probability" in optimization.constraints:
-        staged_variables.update(['p1', 'p2'])
+    if "marginal_probability_1" in optimization.constraints:
+        staged_variables.update(['p1'])
+    if "marginal_probability_2" in optimization.constraints:
+        staged_variables.update(['p2'])
+    if "CME" in optimization.constraints:
+        staged_variables.update(['p', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
+    if "marginal_CME_1" in optimization.constraints:
+        staged_variables.update(['p1', 'k_tx_1', 'k_deg_1'])
+    if "marginal_CME_2" in optimization.constraints:
+        staged_variables.update(['p2', 'k_tx_2', 'k_deg_2'])
+
+    # B method telegraph constraints
+    if "marginal_CME_TE" in optimization.constraints:
+        staged_variables.update(['pg1', 'pg2', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+    if "TE_equality" in optimization.constraints:
+        staged_variables.update(['p1', 'p2', 'pg1', 'pg2'])
+
+    # Moment constraints
     if "moment" in optimization.constraints:
         staged_variables.update(['p1', 'p2', 'E_x1', 'E_x2'])
     if "higher_moment" in optimization.constraints:
         staged_variables.update(['p1', 'p2'])
-    if "CME" in optimization.constraints:
-        staged_variables.update(['p', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
-    if "marginal_CME" in optimization.constraints:
-        staged_variables.update(['p1', 'p2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
-    if "marginal_CME_TE" in optimization.constraints:
-        staged_variables.update(['pg1', 'pg2', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
-    if "factorization" in optimization.constraints:
-        staged_variables.update(['p', 'p1', 'p2'])
-    if "TE_equality" in optimization.constraints:
-        staged_variables.update(['p1', 'p2', 'pg1', 'pg2'])
     if "dummy_moment" in optimization.constraints:
         staged_variables.update(['E_x1', 'E_x2'])
 
+    # downsampled constraints
     if "downsampled_probability" in optimization.constraints:
         staged_variables.update(['pd'])
-    if "downsampled_marginal_probability" in optimization.constraints:
-        staged_variables.update(['pd1', 'pd2'])
+    if "downsampled_marginal_probability_1" in optimization.constraints:
+        staged_variables.update(['pd1'])
+    if "downsampled_marginal_probability_2" in optimization.constraints:
+        staged_variables.update(['pd2'])
     if "downsampled_CME" in optimization.constraints:
         staged_variables.update(['pd', 'fm', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
-    if "downsampled_marginal_CME" in optimization.constraints:
-        staged_variables.update(['pd1', 'pg2', 'fm1', 'fm2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+    if "downsampled_marginal_CME_1" in optimization.constraints:
+        staged_variables.update(['pd1', 'fm1', 'k_tx_1', 'k_deg_1'])
+    if "downsampled_marginal_CME_2" in optimization.constraints:
+        staged_variables.update(['pg2', 'fm2', 'k_tx_2', 'k_deg_2'])
 
     # variable dict
     variables = {}
@@ -67,6 +91,7 @@ def add_variables(optimization, model, i):
     if 'p' in staged_variables:
         variables['p'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1, optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p", lb=0, ub=1)
         model.addConstr(variables['p'].sum() <= 1, name="Dist_p")
+    
     if 'k_on_1' in staged_variables:
         variables['k_on_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_on_1", lb=0, ub=optimization.K)
     if 'k_on_2' in staged_variables:
@@ -85,6 +110,7 @@ def add_variables(optimization, model, i):
         variables['k_deg_2'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_deg_2", lb=0, ub=optimization.K)
     if 'k_reg' in staged_variables:
         variables['k_reg'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_reg", lb=0, ub=optimization.K)
+    
     if 'E_x1' in staged_variables:
         variables['E_x1'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x1")
     if 'E_x2' in staged_variables:
@@ -99,6 +125,7 @@ def add_variables(optimization, model, i):
     if 'pd' in staged_variables:
         variables['pd'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd", lb=0, ub=1)
         model.addConstr(variables['pd'].sum() <= 1, name="Dist_pd")
+    
     if 'fm1' in staged_variables:
         variables['fm1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm1", lb=0, ub=1)
     if 'fm2' in staged_variables:
@@ -114,6 +141,38 @@ def add_variables(optimization, model, i):
 
 def add_constraints(optimization, model, variables, i):
 
+    # Base constraints
+    if "k_deg_1" in optimization.constraints:
+        add_k_deg_1_constraints(
+            model,
+            variables
+        )
+    if "k_deg_2" in optimization.constraints:
+        add_k_deg_2_constraints(
+            model,
+            variables
+        )
+    if "k_reg" in optimization.constraints:
+        add_k_reg_constraints(
+            model,
+            variables
+        )
+    
+    # B method birth death constraints
+    if "factorization" in optimization.constraints:
+        add_factorization_constraints(
+            model,
+            variables
+        )
+    if "joint_probability" in optimization.constraints:
+        add_joint_probability_constraints(
+            model,
+            variables,
+            optimization.dataset.probs_OB[f'sample-{i}'],
+            optimization.dataset.truncation_OB[f'sample-{i}'],
+            optimization.dataset.truncation_OG,
+            optimization.dataset.name
+        )
     if "probability" in optimization.constraints:
         add_probability_constraints(
             model,
@@ -123,8 +182,8 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.truncation_OG,
             optimization.dataset.name
         )
-    if "marginal_probability" in optimization.constraints:
-        add_marginal_probability_constraints(
+    if "marginal_probability_1" in optimization.constraints:
+        add_marginal_probability_1_constraints(
             model,
             variables,
             optimization.dataset.probs_OB[f'sample-{i}'],
@@ -132,6 +191,49 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.truncation_OG,
             optimization.dataset.name
         )
+    if "marginal_probability_2" in optimization.constraints:
+        add_marginal_probability_1_constraints(
+            model,
+            variables,
+            optimization.dataset.probs_OB[f'sample-{i}'],
+            optimization.dataset.truncationM_OB[f'sample-{i}'],
+            optimization.dataset.truncation_OG,
+            optimization.dataset.name
+        )
+    if "CME" in optimization.constraints:
+        add_CME_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+    if "marginal_CME_1" in optimization.constraints:
+        add_marginal_CME_1_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+    if "marginal_CME_2" in optimization.constraints:
+        add_marginal_CME_2_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+
+    # B method telegraph constraints
+    if "marginal_CME_TE" in optimization.constraints:
+        add_marginal_CME_TE_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+    if "TE_equality" in optimization.constraints:
+        add_TE_equality_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+
+    # Moment constraints
     if "moment" in optimization.constraints:
         add_moment_constraints(
             model,
@@ -148,35 +250,6 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.moments_OB[f'sample-{i}'],
             optimization.dataset.beta
         )
-    if "CME" in optimization.constraints:
-        add_CME_constraints(
-            model,
-            variables,
-            optimization.overall_extent_OG[f'sample-{i}']
-        )
-    if "marginal_CME" in optimization.constraints:
-        add_marginal_CME_constraints(
-            model,
-            variables,
-            optimization.overall_extent_OG[f'sample-{i}']
-        )
-    if "marginal_CME_TE" in optimization.constraints:
-        add_marginal_CME_TE_constraints(
-            model,
-            variables,
-            optimization.overall_extent_OG[f'sample-{i}']
-        )
-    if "factorization" in optimization.constraints:
-        add_factorization_constraints(
-            model,
-            variables
-        )
-    if "TE_equality" in optimization.constraints:
-        add_TE_equality_constraints(
-            model,
-            variables,
-            optimization.overall_extent_OG[f'sample-{i}']
-        )
     if "dummy_moment" in optimization.constraints:
         add_dummy_moment_constraints(
             model,
@@ -185,6 +258,7 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.beta
         )
 
+    # Downsampled constraints
     if "downsampled_probability" in optimization.constraints:
         add_downsampled_probability_constraints(
             model,
@@ -192,8 +266,15 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.probs_OB[f'sample-{i}'],
             optimization.dataset.truncation_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_probability" in optimization.constraints:
-        add_downsampled_marginal_probability_constraints(
+    if "downsampled_marginal_probability_1" in optimization.constraints:
+        add_downsampled_marginal_probability_1_constraints(
+            model,
+            variables,
+            optimization.dataset.probs_OB[f'sample-{i}'],
+            optimization.dataset.truncationM_OB[f'sample-{i}']
+        )
+    if "downsampled_marginal_probability_2" in optimization.constraints:
+        add_downsampled_marginal_probability_2_constraints(
             model,
             variables,
             optimization.dataset.probs_OB[f'sample-{i}'],
@@ -206,8 +287,15 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.fm_OB[f'sample-{i}'],
             optimization.dataset.truncation_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_CME" in optimization.constraints:
-        add_downsampled_marginal_CME_constraints(
+    if "downsampled_marginal_CME_1" in optimization.constraints:
+        add_downsampled_marginal_CME_1_constraints(
+            model,
+            variables,
+            optimization.dataset.fm_OB[f'sample-{i}'],
+            optimization.dataset.truncationM_OB[f'sample-{i}']
+        )
+    if "downsampled_marginal_CME_2" in optimization.constraints:
+        add_downsampled_marginal_CME_2_constraints(
             model,
             variables,
             optimization.dataset.fm_OB[f'sample-{i}'],
@@ -222,14 +310,61 @@ def add_k_deg_1_constraints(model, variables):
     model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
 
 def add_k_deg_2_constraints(model, variables):
-    model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
+    model.addConstr(variables['k_deg_2'] == 1, name="Fix_k_deg_2")
 
 def add_k_reg_constraints(model, variables):
     model.addConstr(variables['k_reg'] == 0, name="Fix_k_reg")
 
 # ------------------------------------------------
-# B method constraints
+# B method Birth Death constraints
 # ------------------------------------------------
+
+def add_factorization_constraints(model, variables):
+
+    # get variables
+    p1 = variables['p1']
+    p2 = variables['p2']
+    p = variables['p']
+
+    # outer product marginals
+    outer = p1[:, None] @ p2[None, :]
+
+    # equate dummy joint variable to product of marginals: all original states
+    model.addConstr(p == outer, name=f"Joint_factorize")
+
+def add_joint_probability_constraints(model, variables, probs_OB, truncation_OB, truncation_OG, dataset_name):
+    '''
+    Joint probability constraints without independence
+    Will be computationally impossible for all but high capture
+    Only for comparison tests to downsampled data
+    '''
+
+    # get OB truncation for sample i
+    min_x1_OB = truncation_OB['min_x1_OB']
+    max_x1_OB = truncation_OB['max_x1_OB']
+    min_x2_OB = truncation_OB['min_x2_OB']
+    max_x2_OB = truncation_OB['max_x2_OB']
+            
+    # for each OB state pair in truncation
+    for x1_OB in range(min_x1_OB, max_x1_OB + 1):
+        for x2_OB in range(min_x2_OB, max_x2_OB + 1):
+
+            # get OG truncation for OB state pair
+            min_x1_OG, max_x1_OG = truncation_OG[x1_OB]
+            min_x2_OG, max_x2_OG = truncation_OG[x2_OB]
+            
+            # load coefficient grid for OB state pair
+            B_coeffs = np.load(f"./Temp/Coefficients/{dataset_name}-state-{x1_OB}-{x2_OB}.npy")
+
+            # slice variables to truncation
+            p_slice = variables['p'][min_x1_OG: max_x1_OG + 1, min_x2_OG: max_x2_OG + 1]
+
+            # B matrix sum
+            sum_expr = gp.quicksum(B_coeffs * p_slice)
+        
+            # form constraints using CI bounds
+            model.addConstr(sum_expr >= probs_OB['bounds'][0, x1_OB, x2_OB], name=f"B_lb_{x1_OB}_{x2_OB}")
+            model.addConstr(sum_expr <= probs_OB['bounds'][1, x1_OB, x2_OB], name=f"B_ub_{x1_OB}_{x2_OB}")
 
 def add_probability_constraints(model, variables, probs_OB, truncation_OB, truncation_OG, dataset_name):
 
@@ -238,9 +373,6 @@ def add_probability_constraints(model, variables, probs_OB, truncation_OB, trunc
     max_x1_OB = truncation_OB['max_x1_OB']
     min_x2_OB = truncation_OB['min_x2_OB']
     max_x2_OB = truncation_OB['max_x2_OB']
-
-    # load CI bounds for sample i
-    # bounds = np.load(f"./Temp/Bounds/Joint/{dataset_name}-sample-{i}.npy")
             
     # for each OB state pair in truncation
     for x1_OB in range(min_x1_OB, max_x1_OB + 1):
@@ -264,17 +396,11 @@ def add_probability_constraints(model, variables, probs_OB, truncation_OB, trunc
             model.addConstr(sum_expr >= probs_OB['bounds'][0, x1_OB, x2_OB], name=f"B_lb_{x1_OB}_{x2_OB}")
             model.addConstr(sum_expr <= probs_OB['bounds'][1, x1_OB, x2_OB], name=f"B_ub_{x1_OB}_{x2_OB}")
 
-def add_marginal_probability_constraints(model, variables, probs_OB, truncationM_OB, truncation_OG, dataset_name):
+def add_marginal_probability_1_constraints(model, variables, probs_OB, truncationM_OB, truncation_OG, dataset_name):
 
     # get marginal OB truncation for sample i
     minM_x1_OB = truncationM_OB['minM_x1_OB']
     maxM_x1_OB = truncationM_OB['maxM_x1_OB']
-    minM_x2_OB = truncationM_OB['minM_x2_OB']
-    maxM_x2_OB = truncationM_OB['maxM_x2_OB']
-
-    # load CI bounds for sample i
-    #x1_bounds = np.load(f"./Temp/Bounds/x1_marginal/{dataset_name}-sample-{i}.npy")
-    #x2_bounds = np.load(f"./Temp/Bounds/x2_marginal/{dataset_name}-sample-{i}.npy")
 
     # for each OB state in truncation
     for x1_OB in range(minM_x1_OB, maxM_x1_OB + 1):
@@ -295,7 +421,13 @@ def add_marginal_probability_constraints(model, variables, probs_OB, truncationM
         model.addConstr(sum_expr >= probs_OB['x1_bounds'][0, x1_OB], name=f"Bm_x1_lb_{x1_OB}")
         model.addConstr(sum_expr <= probs_OB['x1_bounds'][1, x1_OB], name=f"Bm_x1_ub_{x1_OB}")
 
-    # repeat for x2
+def add_marginal_probability_2_constraints(model, variables, probs_OB, truncationM_OB, truncation_OG, dataset_name):
+
+    # get marginal OB truncation for sample i
+    minM_x2_OB = truncationM_OB['minM_x2_OB']
+    maxM_x2_OB = truncationM_OB['maxM_x2_OB']
+
+    # for each OB state in truncation
     for x2_OB in range(minM_x2_OB, maxM_x2_OB + 1):
 
         # get OG truncation
@@ -313,6 +445,186 @@ def add_marginal_probability_constraints(model, variables, probs_OB, truncationM
         # form constraints using CI bounds
         model.addConstr(sum_expr >= probs_OB['x2_bounds'][0, x2_OB], name=f"Bm_x2_lb_{x2_OB}")
         model.addConstr(sum_expr <= probs_OB['x2_bounds'][1, x2_OB], name=f"Bm_x2_ub_{x2_OB}")
+
+def add_CME_constraints(model, variables, overall_extent_OG):
+
+    # get extent of OG states
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
+
+    # get variables
+    p = variables['p']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_1']
+    k_deg_2 = variables['k_deg_2']
+    k_reg = variables['k_reg']
+    
+    # manually add x1_OG = x2_OG = 0 constraint (to avoid p(0) terms)
+    model.addConstr(
+        0 == k_deg_1 * p[1, 0] + \
+        k_deg_2 * p[0, 1] + \
+        k_reg * p[1, 1] - \
+        (k_tx_1 + k_tx_2) * p[0, 0],
+        name="CME_0_0"
+    )
+
+    # manually add x1_OG = 0 constraints (to avoid p1(-1) terms)
+    model.addConstrs(
+        (
+            0 == k_tx_2 * p[0, x2_OG - 1] + \
+            k_deg_1 * p[1, x2_OG] + \
+            k_deg_2 * (x2_OG + 1) * p[0, x2_OG + 1] + \
+            k_reg * (x2_OG + 1) * p[1, x2_OG + 1] - \
+            (k_tx_1 + k_tx_2 + k_deg_2 * x2_OG) * p[0, x2_OG]
+            for x2_OG in range(1, max_x2_OG)
+        ),
+        name="CME_0_x2"
+    )
+    # manually add x2_OG = 0 constraints (to avoid p2(-1) terms)
+    model.addConstrs(
+        (
+            0 == k_tx_1 * p[x1_OG - 1, 0] + \
+            k_deg_1 * (x1_OG + 1) * p[x1_OG + 1, 0] + \
+            k_deg_2 * p[x1_OG, 1] + \
+            k_reg * (x1_OG + 1) * p[x1_OG + 1, 1] - \
+            (k_tx_1 + k_tx_2 + k_deg_1 * x1_OG) * p[x1_OG, 0]
+            for x1_OG in range(1, max_x1_OG)
+        ),
+        name="CME_x1_0"
+    )
+
+    # add CME constraints
+    model.addConstrs(
+        (
+            0 == k_tx_1 * p[x1_OG - 1, x2_OG] + \
+            k_tx_2 * p[x1_OG, x2_OG - 1] + \
+            k_deg_1 * (x1_OG + 1) * p[x1_OG + 1, x2_OG] + \
+            k_deg_2 * (x2_OG + 1) * p[x1_OG, x2_OG + 1] + \
+            k_reg * (x1_OG + 1) * (x2_OG + 1) * p[x1_OG + 1, x2_OG + 1] - \
+            (k_tx_1 + k_tx_2 + k_deg_1 * x1_OG + k_deg_2 * x2_OG + k_reg * x1_OG * x2_OG) * p[x1_OG, x2_OG]
+            for x1_OG in range(1, max_x1_OG)
+            for x2_OG in range(1, max_x2_OG)
+        ),
+        name="CME_x1_x2"
+    )
+
+def add_marginal_CME_1_constraints(model, variables, overall_extent_OG):
+
+    # get extent of OG states
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+
+    # get variables
+    p1 = variables['p1']
+    k_tx_1 = variables['k_tx_1']
+    k_deg_1 = variables['k_deg_1']
+
+    # construct Q matrices: 1 more column than square to add upper diagonal to last row
+    Q_tx_1 = (np.diag([1 for x in range(1, max_x1_OG + 1)], -1) - np.diag([1 for x in range(max_x1_OG + 1)]))[:-1, :]
+    Q_deg_1 = (np.diag([x for x in range(1, max_x1_OG + 1)], 1) - np.diag([x for x in range(max_x1_OG + 1)]))[:-1, :]
+
+    # add matrix constraints
+    model.addConstr(
+        k_tx_1 * (Q_tx_1 @ p1) + k_deg_1 * (Q_deg_1 @ p1) == 0,
+        name="Marginal_CME_x1"
+    )
+
+def add_marginal_CME_2_constraints(model, variables, overall_extent_OG):
+
+    # get extent of OG states
+    max_x2_OG = overall_extent_OG['max_x2_OG']
+
+    # get variables
+    p2 = variables['p2']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_2 = variables['k_deg_2']
+
+    # construct Q matrices: 1 more column than square to add upper diagonal to last row
+    Q_tx_2 = (np.diag([1 for x in range(1, max_x2_OG + 1)], -1) - np.diag([1 for x in range(max_x2_OG + 1)]))[:-1, :]
+    Q_deg_2 = (np.diag([x for x in range(1, max_x2_OG + 1)], 1) - np.diag([x for x in range(max_x2_OG + 1)]))[:-1, :]
+
+    # add matrix constraints
+    model.addConstr(
+        k_tx_2 * (Q_tx_2 @ p2) + k_deg_2 * (Q_deg_2 @ p2) == 0,
+        name="Marginal_CME_x2"
+    )
+
+# ------------------------------------------------
+# B method Telegraph constraints
+# ------------------------------------------------
+
+def add_marginal_CME_TE_constraints(model, variables, overall_extent_OG):
+
+    # get extent of OG states
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
+
+    # get variables
+    pg1 = variables['pg1']
+    pg2 = variables['pg2']
+    k_on_1 = variables['k_on_1']
+    k_on_2 = variables['k_on_2']
+    k_off_1 = variables['k_off_1']
+    k_off_2 = variables['k_off_2']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_1']
+    k_deg_2 = variables['k_deg_2']
+
+    # variable sizes
+    N1 = 2*(max_x1_OG + 1)
+    N2 = 2*(max_x2_OG + 1)
+
+    # construct Q matrices
+    Q_on_1 = (np.diag([0 if x % 2 else -1 for x in range(N1)]) + np.diag([0 if x % 2 else 1 for x in range(N1 - 1)], -1))[:-2, :]
+    Q_on_2 = (np.diag([0 if x % 2 else -1 for x in range(N2)]) + np.diag([0 if x % 2 else 1 for x in range(N2 - 1)], -1))[:-2, :]
+
+    Q_off_1 = (np.diag([-1 if x % 2 else 0 for x in range(N1)]) + np.diag([0 if x % 2 else 1 for x in range(N1 - 1)], 1))[:-2, :]
+    Q_off_2 = (np.diag([-1 if x % 2 else 0 for x in range(N2)]) + np.diag([0 if x % 2 else 1 for x in range(N2 - 1)], 1))[:-2, :]
+
+    Q_tx_1 = (np.diag([-1 if x % 2 else 0 for x in range(N1)]) + np.diag([1 if x % 2 else 0 for x in range(N1 - 2)], -2))[:-2, :]
+    Q_tx_2 = (np.diag([-1 if x % 2 else 0 for x in range(N2)]) + np.diag([1 if x % 2 else 0 for x in range(N2 - 2)], -2))[:-2, :]
+
+    deg_diag_1 = np.array([(x // 2) for x in range(N1)])
+    deg_diag_2 = np.array([(x // 2) for x in range(N2)])
+
+    Q_deg_1 = (np.diag(-deg_diag_1) + np.diag(deg_diag_1[2:], 2))[:-2, ]
+    Q_deg_2 = (np.diag(-deg_diag_2) + np.diag(deg_diag_2[2:], 2))[:-2, ]
+
+    # add matrix constraints
+    model.addConstr(
+        k_on_1 * (Q_on_1 @ pg1) + k_off_1 * (Q_off_1 @ pg1) + k_tx_1 * (Q_tx_1 @ pg1) + k_deg_1 * (Q_deg_1 @ pg1) == 0,
+        name="Marginal_CME_x1"
+    )
+
+    model.addConstr(
+        k_on_2 * (Q_on_2 @ pg2) + k_off_2 * (Q_off_2 @ pg2) + k_tx_2 * (Q_tx_2 @ pg2) + k_deg_2 * (Q_deg_2 @ pg2) == 0,
+        name="Marginal_CME_x2"
+    )
+
+def add_TE_equality_constraints(model, variables, overall_extent_OG):
+
+    # use extent of threshold truncation for OG states
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
+
+    # get variables
+    p1 = variables['p1']
+    p2 = variables['p2']
+    pg1 = variables['pg1']
+    pg2 = variables['pg2']
+
+    # construct A matrices
+    A1 = np.repeat(np.eye(max_x1_OG + 1, dtype=int), repeats=2, axis=1)
+    A2 = np.repeat(np.eye(max_x2_OG + 1, dtype=int), repeats=2, axis=1)
+
+    # equate p1 and p2 to pg1 and pg2 sums
+    model.addConstr(p1 == A1 @ pg1)
+    model.addConstr(p2 == A2 @ pg2)
+
+# ------------------------------------------------
+# Moment constraints
+# ------------------------------------------------
 
 def add_moment_constraints(model, variables, moment_extent_OG, moments_OB, beta):
 
@@ -380,186 +692,6 @@ def add_higher_moment_constraints(model, variables, moment_extent_OG, moments_OB
     model.addConstr(expr_E_x2_sq_OB <= moments_OB['E_x2_sq'][1], name="E_x2_sq_UB")
     model.addConstr(expr_E_x2_sq_OB >= moments_OB['E_x2_sq'][0], name="E_x2_sq_LB")
 
-def add_CME_constraints(model, variables, overall_extent_OG):
-
-    # get extent of OG states
-    max_x1_OG = overall_extent_OG['max_x1_OG']
-    max_x2_OG = overall_extent_OG['max_x2_OG']
-
-    # get variables
-    p = variables['p']
-    k_tx_1 = variables['k_tx_1']
-    k_tx_2 = variables['k_tx_2']
-    k_deg_1 = variables['k_deg_2']
-    k_deg_2 = variables['k_deg_1']
-    k_reg = variables['k_reg']
-    
-    # manually add x1_OG = x2_OG = 0 constraint (to avoid p(0) terms)
-    model.addConstr(
-        0 == k_deg_1 * p[1, 0] + \
-        k_deg_2 * p[0, 1] + \
-        k_reg * p[1, 1] - \
-        (k_tx_1 + k_tx_2) * p[0, 0],
-        name="CME_0_0"
-    )
-
-    # manually add x1_OG = 0 constraints (to avoid p1(-1) terms)
-    model.addConstrs(
-        (
-            0 == k_tx_2 * p[0, x2_OG - 1] + \
-            k_deg_1 * p[1, x2_OG] + \
-            k_deg_2 * (x2_OG + 1) * p[0, x2_OG + 1] + \
-            k_reg * (x2_OG + 1) * p[1, x2_OG + 1] - \
-            (k_tx_1 + k_tx_2 + k_deg_2 * x2_OG) * p[0, x2_OG]
-            for x2_OG in range(1, max_x2_OG)
-        ),
-        name="CME_0_x2"
-    )
-    # manually add x2_OG = 0 constraints (to avoid p2(-1) terms)
-    model.addConstrs(
-        (
-            0 == k_tx_1 * p[x1_OG - 1, 0] + \
-            k_deg_1 * (x1_OG + 1) * p[x1_OG + 1, 0] + \
-            k_deg_2 * p[x1_OG, 1] + \
-            k_reg * (x1_OG + 1) * p[x1_OG + 1, 1] - \
-            (k_tx_1 + k_tx_2 + k_deg_1 * x1_OG) * p[x1_OG, 0]
-            for x1_OG in range(1, max_x1_OG)
-        ),
-        name="CME_x1_0"
-    )
-
-    # add CME constraints
-    model.addConstrs(
-        (
-            0 == k_tx_1 * p[x1_OG - 1, x2_OG] + \
-            k_tx_2 * p[x1_OG, x2_OG - 1] + \
-            k_deg_1 * (x1_OG + 1) * p[x1_OG + 1, x2_OG] + \
-            k_deg_2 * (x2_OG + 1) * p[x1_OG, x2_OG + 1] + \
-            k_reg * (x1_OG + 1) * (x2_OG + 1) * p[x1_OG + 1, x2_OG + 1] - \
-            (k_tx_1 + k_tx_2 + k_deg_1 * x1_OG + k_deg_2 * x2_OG + k_reg * x1_OG * x2_OG) * p[x1_OG, x2_OG]
-            for x1_OG in range(1, max_x1_OG)
-            for x2_OG in range(1, max_x2_OG)
-        ),
-        name="CME_x1_x2"
-    )
-
-def add_marginal_CME_constraints(model, variables, overall_extent_OG):
-
-    # get extent of OG states
-    max_x1_OG = overall_extent_OG['max_x1_OG']
-    max_x2_OG = overall_extent_OG['max_x2_OG']
-
-    # get variables
-    p1 = variables['p1']
-    p2 = variables['p2']
-    k_tx_1 = variables['k_tx_1']
-    k_tx_2 = variables['k_tx_2']
-    k_deg_1 = variables['k_deg_2']
-    k_deg_2 = variables['k_deg_1']
-
-    # construct Q matrices: 1 more column than square to add upper diagonal to last row
-    Q_tx_1 = (np.diag([1 for x in range(1, max_x1_OG + 1)], -1) - np.diag([1 for x in range(max_x1_OG + 1)]))[:-1, :]
-    Q_tx_2 = (np.diag([1 for x in range(1, max_x2_OG + 1)], -1) - np.diag([1 for x in range(max_x2_OG + 1)]))[:-1, :]
-    Q_deg_1 = (np.diag([x for x in range(1, max_x1_OG + 1)], 1) - np.diag([x for x in range(max_x1_OG + 1)]))[:-1, :]
-    Q_deg_2 = (np.diag([x for x in range(1, max_x2_OG + 1)], 1) - np.diag([x for x in range(max_x2_OG + 1)]))[:-1, :]
-
-    # add matrix constraints
-    model.addConstr(
-        k_tx_1 * (Q_tx_1 @ p1) + k_deg_1 * (Q_deg_1 @ p1) == 0,
-        name="Marginal_CME_x1"
-    )
-
-    model.addConstr(
-        k_tx_2 * (Q_tx_2 @ p2) + k_deg_2 * (Q_deg_2 @ p2) == 0,
-        name="Marginal_CME_x2"
-    )
-
-def add_marginal_CME_TE_constraints(model, variables, overall_extent_OG):
-
-    # get extent of OG states
-    max_x1_OG = overall_extent_OG['max_x1_OG']
-    max_x2_OG = overall_extent_OG['max_x2_OG']
-
-    # get variables
-    pg1 = variables['pg1']
-    pg2 = variables['pg2']
-    k_on_1 = variables['k_on_1']
-    k_on_2 = variables['k_on_2']
-    k_off_1 = variables['k_off_1']
-    k_off_2 = variables['k_off_2']
-    k_tx_1 = variables['k_tx_1']
-    k_tx_2 = variables['k_tx_2']
-    k_deg_1 = variables['k_deg_2']
-    k_deg_2 = variables['k_deg_1']
-
-    # variable sizes
-    N1 = 2*(max_x1_OG + 1)
-    N2 = 2*(max_x2_OG + 1)
-
-    # construct Q matrices
-    Q_on_1 = (np.diag([0 if x % 2 else -1 for x in range(N1)]) + np.diag([0 if x % 2 else 1 for x in range(N1 - 1)], -1))[:-2, :]
-    Q_on_2 = (np.diag([0 if x % 2 else -1 for x in range(N2)]) + np.diag([0 if x % 2 else 1 for x in range(N2 - 1)], -1))[:-2, :]
-
-    Q_off_1 = (np.diag([-1 if x % 2 else 0 for x in range(N1)]) + np.diag([0 if x % 2 else 1 for x in range(N1 - 1)], 1))[:-2, :]
-    Q_off_2 = (np.diag([-1 if x % 2 else 0 for x in range(N2)]) + np.diag([0 if x % 2 else 1 for x in range(N2 - 1)], 1))[:-2, :]
-
-    Q_tx_1 = (np.diag([-1 if x % 2 else 0 for x in range(N1)]) + np.diag([1 if x % 2 else 0 for x in range(N1 - 2)], -2))[:-2, :]
-    Q_tx_2 = (np.diag([-1 if x % 2 else 0 for x in range(N2)]) + np.diag([1 if x % 2 else 0 for x in range(N2 - 2)], -2))[:-2, :]
-
-    deg_diag_1 = np.array([(x // 2) for x in range(N1)])
-    deg_diag_2 = np.array([(x // 2) for x in range(N2)])
-
-    Q_deg_1 = (np.diag(-deg_diag_1) + np.diag(deg_diag_1[2:], 2))[:-2, ]
-    Q_deg_2 = (np.diag(-deg_diag_2) + np.diag(deg_diag_2[2:], 2))[:-2, ]
-
-    # add matrix constraints
-    model.addConstr(
-        k_on_1 * (Q_on_1 @ pg1) + k_off_1 * (Q_off_1 @ pg1) + k_tx_1 * (Q_tx_1 @ pg1) + k_deg_1 * (Q_deg_1 @ pg1) == 0,
-        name="Marginal_CME_x1"
-    )
-
-    model.addConstr(
-        k_on_2 * (Q_on_2 @ pg2) + k_off_2 * (Q_off_2 @ pg2) + k_tx_2 * (Q_tx_2 @ pg2) + k_deg_2 * (Q_deg_2 @ pg2) == 0,
-        name="Marginal_CME_x2"
-    )
-
-def add_TE_equality_constraints(model, variables, overall_extent_OG):
-
-    # use extent of threshold truncation for OG states
-    max_x1_OG = overall_extent_OG['max_x1_OG']
-    max_x2_OG = overall_extent_OG['max_x2_OG']
-
-    # get variables
-    p1 = variables['p1']
-    p2 = variables['p2']
-    pg1 = variables['pg1']
-    pg2 = variables['pg2']
-
-    # construct A matrices
-    A1 = np.repeat(np.eye(max_x1_OG + 1, dtype=int), repeats=2, axis=1)
-    A2 = np.repeat(np.eye(max_x2_OG + 1, dtype=int), repeats=2, axis=1)
-
-    # equate p1 and p2 to pg1 and pg2 sums
-    model.addConstr(p1 == A1 @ pg1)
-    model.addConstr(p2 == A2 @ pg2)
-
-def add_factorization_constraints(model, variables):
-
-    # get variables
-    p1 = variables['p1']
-    p2 = variables['p2']
-    p = variables['p']
-
-    # outer product marginals
-    outer = p1[:, None] @ p2[None, :]
-
-    # equate dummy joint variable to product of marginals: all original states
-    model.addConstr(p == outer, name=f"Joint_factorize")
-
-# ------------------------------------------------
-# Moment constraints
-# ------------------------------------------------
-
 def add_dummy_moment_constraints(model, variables, moments_OB, beta):
 
     # get variables
@@ -586,13 +718,9 @@ def add_dummy_moment_constraints(model, variables, moments_OB, beta):
 
 def add_downsampled_probability_constraints(model, variables, probs_OB, truncation_OB):
 
-    # get OB truncation for sample i
-    # min_x1_OB = truncation_OB['min_x1_OB']
+    # get OB truncation for sample i (NOTE: only using upper boundary)
     max_x1_OB = truncation_OB['max_x1_OB']
-    # min_x2_OB = truncation_OB['min_x2_OB']
     max_x2_OB = truncation_OB['max_x2_OB']
-
-    # NOTE: currently only using upper truncation boundary
 
     # get variables
     pd = variables['pd']
@@ -601,23 +729,27 @@ def add_downsampled_probability_constraints(model, variables, probs_OB, truncati
     model.addConstr(pd <= probs_OB['bounds'][1, :max_x1_OB + 1, :max_x2_OB + 1], name="pd_UB")
     model.addConstr(pd >= probs_OB['bounds'][0, :max_x1_OB + 1, :max_x2_OB + 1], name="pd_LB")
 
-def add_downsampled_marginal_probability_constraints(model, variables, probs_OB, truncationM_OB):
+def add_downsampled_marginal_probability_1_constraints(model, variables, probs_OB, truncationM_OB):
 
-    # get OB truncation for sample i
-    # min_x1_OB = truncationM_OB['min_x1_OB']
+    # get OB truncation for sample i (NOTE: only using upper boundary)
     max_x1_OB = truncationM_OB['maxM_x1_OB']
-    # min_x2_OB = truncationM_OB['min_x2_OB']
-    max_x2_OB = truncationM_OB['maxM_x2_OB']
-
-    # NOTE: currently only using upper truncation boundary
 
     # get variables
     pd1 = variables['pd1']
-    pd2 = variables['pd2']
 
     # CI bounds
     model.addConstr(pd1 <= probs_OB['x1_bounds'][1, :max_x1_OB + 1], name="pd1_UB")
     model.addConstr(pd1 >= probs_OB['x1_bounds'][0, :max_x1_OB + 1], name="pd1_LB")
+
+def add_downsampled_marginal_probability_2_constraints(model, variables, probs_OB, truncationM_OB):
+    
+    # get OB truncation for sample i (NOTE: only using upper boundary)
+    max_x2_OB = truncationM_OB['maxM_x2_OB']
+
+    # get variables
+    pd2 = variables['pd2']
+
+    # CI bounds
     model.addConstr(pd2 <= probs_OB['x2_bounds'][1, :max_x2_OB + 1], name="pd2_UB")
     model.addConstr(pd2 >= probs_OB['x2_bounds'][0, :max_x2_OB + 1], name="pd2_LB")
 
@@ -632,8 +764,8 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
     fm = variables['fm']
     k_tx_1 = variables['k_tx_1']
     k_tx_2 = variables['k_tx_2']
-    k_deg_1 = variables['k_deg_2']
-    k_deg_2 = variables['k_deg_1']
+    k_deg_1 = variables['k_deg_1']
+    k_deg_2 = variables['k_deg_2']
     k_reg = variables['k_reg']
 
     # fm rate bounds
@@ -693,27 +825,20 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
         name="CME_d_x1_x2"
     )
 
-def add_downsampled_marginal_CME_constraints(model, variables, fm_OB, truncationM_OB):
-
+def add_downsampled_marginal_CME_1_constraints(model, variables, fm_OB, truncationM_OB):
+    
     # get OB truncation for sample i 
     max_x1_OB = truncationM_OB['maxM_x1_OB']
-    max_x2_OB = truncationM_OB['maxM_x2_OB']
 
     # get variables
     pd1 = variables['pd1']
-    pd2 = variables['pd2']
     fm1 = variables['fm1']
-    fm2 = variables['fm2']
     k_tx_1 = variables['k_tx_1']
-    k_tx_2 = variables['k_tx_2']
-    k_deg_1 = variables['k_deg_2']
-    k_deg_2 = variables['k_deg_1']
+    k_deg_1 = variables['k_deg_1']
 
     # fm rate bounds
     model.addConstr(fm1 <= fm_OB['fm1'][1, :max_x1_OB + 1], name="fm1_UB")
     model.addConstr(fm1 >= fm_OB['fm1'][0, :max_x1_OB + 1], name="fm1_LB")
-    model.addConstr(fm2 <= fm_OB['fm2'][1, :max_x2_OB + 1], name="fm2_UB")
-    model.addConstr(fm2 >= fm_OB['fm2'][0, :max_x2_OB + 1], name="fm2_LB")
 
     # dummy zero variable for non-linear constraints
     z = model.addVar()
@@ -736,6 +861,25 @@ def add_downsampled_marginal_CME_constraints(model, variables, fm_OB, truncation
         name="CME_d_x1"
     )
 
+def add_downsampled_marginal_CME_2_constraints(model, variables, fm_OB, truncationM_OB):
+    
+    # get OB truncation for sample i
+    max_x2_OB = truncationM_OB['maxM_x2_OB']
+
+    # get variables
+    pd2 = variables['pd2']
+    fm2 = variables['fm2']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_2 = variables['k_deg_2']
+
+    # fm rate bounds
+    model.addConstr(fm2 <= fm_OB['fm2'][1, :max_x2_OB + 1], name="fm2_UB")
+    model.addConstr(fm2 >= fm_OB['fm2'][0, :max_x2_OB + 1], name="fm2_LB")
+
+    # dummy zero variable for non-linear constraints
+    z = model.addVar()
+    model.addConstr(z == 0)
+
     # manually add x2_OB = 0 constraint (to avoid pd2(-1))
     model.addConstr(
         z == k_deg_2 * pd2[1] - k_tx_2 * fm2[0] * pd2[0],
@@ -751,4 +895,4 @@ def add_downsampled_marginal_CME_constraints(model, variables, fm_OB, truncation
             for x2_OB in range(1, max_x2_OB)
         ),
         name="CME_d_x1"
-    ) 
+    )
