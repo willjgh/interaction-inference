@@ -28,7 +28,7 @@ def add_variables(optimization, model, i):
     if "higher_moment" in optimization.constraints:
         staged_variables.update(['p1', 'p2'])
     if "CME" in optimization.constraints:
-        staged_variables.update(['p', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+        staged_variables.update(['p', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
     if "marginal_CME" in optimization.constraints:
         staged_variables.update(['p1', 'p2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
     if "marginal_CME_TE" in optimization.constraints:
@@ -45,7 +45,7 @@ def add_variables(optimization, model, i):
     if "downsampled_marginal_probability" in optimization.constraints:
         staged_variables.update(['pd1', 'pd2'])
     if "downsampled_CME" in optimization.constraints:
-        staged_variables.update(['pd', 'fm', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+        staged_variables.update(['pd', 'fm', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
     if "downsampled_marginal_CME" in optimization.constraints:
         staged_variables.update(['pd1', 'pg2', 'fm1', 'fm2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
 
@@ -83,6 +83,8 @@ def add_variables(optimization, model, i):
         variables['k_deg_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_deg_1", lb=0, ub=optimization.K)
     if 'k_deg_2' in staged_variables:
         variables['k_deg_2'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_deg_2", lb=0, ub=optimization.K)
+    if 'k_reg' in staged_variables:
+        variables['k_reg'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_reg", lb=0, ub=optimization.K)
     if 'E_x1' in staged_variables:
         variables['E_x1'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x1")
     if 'E_x2' in staged_variables:
@@ -390,11 +392,13 @@ def add_CME_constraints(model, variables, overall_extent_OG):
     k_tx_2 = variables['k_tx_2']
     k_deg_1 = variables['k_deg_2']
     k_deg_2 = variables['k_deg_1']
+    k_reg = variables['k_reg']
     
     # manually add x1_OG = x2_OG = 0 constraint (to avoid p(0) terms)
     model.addConstr(
         0 == k_deg_1 * p[1, 0] + \
-        k_deg_2 * p[0, 1] - \
+        k_deg_2 * p[0, 1] + \
+        k_reg * p[1, 1] - \
         (k_tx_1 + k_tx_2) * p[0, 0],
         name="CME_0_0"
     )
@@ -404,7 +408,8 @@ def add_CME_constraints(model, variables, overall_extent_OG):
         (
             0 == k_tx_2 * p[0, x2_OG - 1] + \
             k_deg_1 * p[1, x2_OG] + \
-            k_deg_2 * (x2_OG + 1) * p[0, x2_OG + 1] - \
+            k_deg_2 * (x2_OG + 1) * p[0, x2_OG + 1] + \
+            k_reg * (x2_OG + 1) * p[1, x2_OG + 1] - \
             (k_tx_1 + k_tx_2 + k_deg_2 * x2_OG) * p[0, x2_OG]
             for x2_OG in range(1, max_x2_OG)
         ),
@@ -415,7 +420,8 @@ def add_CME_constraints(model, variables, overall_extent_OG):
         (
             0 == k_tx_1 * p[x1_OG - 1, 0] + \
             k_deg_1 * (x1_OG + 1) * p[x1_OG + 1, 0] + \
-            k_deg_2 * p[x1_OG, 1] - \
+            k_deg_2 * p[x1_OG, 1] + \
+            k_reg * (x1_OG + 1) * p[x1_OG + 1, 1] - \
             (k_tx_1 + k_tx_2 + k_deg_1 * x1_OG) * p[x1_OG, 0]
             for x1_OG in range(1, max_x1_OG)
         ),
@@ -428,8 +434,9 @@ def add_CME_constraints(model, variables, overall_extent_OG):
             0 == k_tx_1 * p[x1_OG - 1, x2_OG] + \
             k_tx_2 * p[x1_OG, x2_OG - 1] + \
             k_deg_1 * (x1_OG + 1) * p[x1_OG + 1, x2_OG] + \
-            k_deg_2 * (x2_OG + 1) * p[x1_OG, x2_OG + 1] - \
-            (k_tx_1 + k_tx_2 + k_deg_1 * x1_OG + k_deg_2 * x2_OG) * p[x1_OG, x2_OG]
+            k_deg_2 * (x2_OG + 1) * p[x1_OG, x2_OG + 1] + \
+            k_reg * (x1_OG + 1) * (x2_OG + 1) * p[x1_OG + 1, x2_OG + 1] - \
+            (k_tx_1 + k_tx_2 + k_deg_1 * x1_OG + k_deg_2 * x2_OG + k_reg * x1_OG * x2_OG) * p[x1_OG, x2_OG]
             for x1_OG in range(1, max_x1_OG)
             for x2_OG in range(1, max_x2_OG)
         ),
@@ -627,6 +634,7 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
     k_tx_2 = variables['k_tx_2']
     k_deg_1 = variables['k_deg_2']
     k_deg_2 = variables['k_deg_1']
+    k_reg = variables['k_reg']
 
     # fm rate bounds
     model.addConstr(fm <= fm_OB['fm1m2'][1, :max_x1_OB + 1, :max_x2_OB + 1], name="fm_UB")
@@ -639,7 +647,8 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
     # manually add x1_OB = x2_OB = 0 constraint (to avoid pd1(-1), pd2(-1) terms)
     model.addConstr(
         z == k_deg_1 * pd[1, 0] + \
-        k_deg_2 * pd[0, 1] - \
+        k_deg_2 * pd[0, 1] + \
+        k_reg * pd[1, 1] - \
         (k_tx_1 * fm[0, 0] + k_tx_2 * fm[0, 0]) * pd[0, 0],
         name="CME_d_0_0"
     )
@@ -649,7 +658,8 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
         (
             z == k_tx_2 * fm[0, x2_OB - 1] * pd[0, x2_OB - 1] + \
             k_deg_1 * pd[1, x2_OB] + \
-            k_deg_2 * (x2_OB + 1) * pd[0, x2_OB + 1] - \
+            k_deg_2 * (x2_OB + 1) * pd[0, x2_OB + 1] + \
+            k_reg * (x2_OB + 1) * pd[1, x2_OB + 1] - \
             (k_tx_1 * fm[0, x2_OB] + k_tx_2 * fm[0, x2_OB] + k_deg_2 * x2_OB) * pd[0, x2_OB]
             for x2_OB in range(1, max_x2_OB)
         ),
@@ -660,7 +670,8 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
         (
             z == k_tx_1 * fm[x1_OB - 1, 0] * pd[x1_OB - 1, 0] + \
             k_deg_1 * (x1_OB + 1) * pd[x1_OB + 1, 0] + \
-            k_deg_2 * pd[x1_OB, 1] - \
+            k_deg_2 * pd[x1_OB, 1] + \
+            k_reg * (x1_OB + 1) * pd[x1_OB + 1, 1] - \
             (k_tx_1 * fm[x1_OB, 0] + k_tx_2 * fm[x1_OB, 0] + k_deg_1 * x1_OB) * pd[x1_OB, 0]
             for x1_OB in range(1, max_x1_OB)
         ),
@@ -673,8 +684,9 @@ def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
             z == k_tx_1 * fm[x1_OB - 1, x2_OB] * pd[x1_OB - 1, x2_OB] + \
             k_tx_2 * fm[x1_OB, x2_OB - 1] * pd[x1_OB, x2_OB - 1] + \
             k_deg_1 * (x1_OB + 1) * pd[x1_OB + 1, x2_OB] + \
-            k_deg_2 * (x2_OB + 1) * pd[x1_OB, x2_OB + 1] - \
-            (k_tx_1 * fm[x1_OB, x2_OB] + k_tx_2 * fm[x1_OB, x2_OB] + k_deg_1 * x1_OB + k_deg_2 * x2_OB) * pd[x1_OB, x2_OB]
+            k_deg_2 * (x2_OB + 1) * pd[x1_OB, x2_OB + 1] + \
+            k_reg * (x1_OB + 1) * (x2_OB + 1) * pd[x1_OB + 1, x2_OB + 1] - \
+            (k_tx_1 * fm[x1_OB, x2_OB] + k_tx_2 * fm[x1_OB, x2_OB] + k_deg_1 * x1_OB + k_deg_2 * x2_OB + k_reg * x1_OB * x2_OB) * pd[x1_OB, x2_OB]
             for x1_OB in range(1, max_x1_OB)
             for x2_OB in range(1, max_x2_OB)
         ),
