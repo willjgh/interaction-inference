@@ -33,8 +33,6 @@ def add_variables(optimization, model, i):
         staged_variables.update(['p1', 'p2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
     if "marginal_CME_TE" in optimization.constraints:
         staged_variables.update(['pg1', 'pg2', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
-    if "base" in optimization.constraints:
-        staged_variables.update(['p1', 'p2', 'k_deg_1', 'k_deg_2'])
     if "factorization" in optimization.constraints:
         staged_variables.update(['p', 'p1', 'p2'])
     if "TE_equality" in optimization.constraints:
@@ -50,10 +48,6 @@ def add_variables(optimization, model, i):
         staged_variables.update(['pd', 'fm', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
     if "downsampled_marginal_CME" in optimization.constraints:
         staged_variables.update(['pd1', 'pg2', 'fm1', 'fm2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
-    if "downsampled_base" in optimization.constraints:
-        staged_variables.update(['pd', 'k_deg_1', 'k_deg_2'])
-    if "downsampled_marginal_base" in optimization.constraints:
-        staged_variables.update(['pd1', 'pd2', 'k_deg_1', 'k_deg_2'])
 
     # variable dict
     variables = {}
@@ -170,11 +164,6 @@ def add_constraints(optimization, model, variables, i):
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
         )
-    if "base" in optimization.constraints:
-        add_base_constraints(
-            model,
-            variables
-        )
     if "factorization" in optimization.constraints:
         add_factorization_constraints(
             model,
@@ -221,16 +210,6 @@ def add_constraints(optimization, model, variables, i):
             variables,
             optimization.dataset.fm_OB[f'sample-{i}'],
             optimization.dataset.truncationM_OB[f'sample-{i}']
-        )
-    if "downsampled_base" in optimization.constraints:
-        add_downsampled_base_constraints(
-            model,
-            variables
-        )
-    if "downsampled_marginal_base" in optimization.constraints:
-        add_downsampled_marginal_base_constraints(
-            model,
-            variables
         )
 
 # ------------------------------------------------
@@ -557,16 +536,6 @@ def add_TE_equality_constraints(model, variables, overall_extent_OG):
     model.addConstr(p1 == A1 @ pg1)
     model.addConstr(p2 == A2 @ pg2)
 
-def add_base_constraints(model, variables):
-
-    # fix k_deg_1 = 1, k_deg = 2 for identifiability
-    model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
-    model.addConstr(variables['k_deg_2'] == 1, name="Fix_k_deg_2")
-
-    # distributional constraints
-    model.addConstr(variables['p1'].sum() <= 1, name="Dist_x1")
-    model.addConstr(variables['p2'].sum() <= 1, name="Dist_x2")
-
 def add_factorization_constraints(model, variables):
 
     # get variables
@@ -770,23 +739,4 @@ def add_downsampled_marginal_CME_constraints(model, variables, fm_OB, truncation
             for x2_OB in range(1, max_x2_OB)
         ),
         name="CME_d_x1"
-    )
-
-def add_downsampled_base_constraints(model, variables):
-
-    # fix k_deg_1 = 1, k_deg = 2 for identifiability
-    model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
-    model.addConstr(variables['k_deg_2'] == 1, name="Fix_k_deg_2")
-
-    # distributional constraints
-    model.addConstr(variables['pd'].sum() <= 1, name="Dist_pd")
-
-def add_downsampled_marginal_base_constraints(model, variables):
-
-    # fix k_deg_1 = 1, k_deg = 2 for identifiability
-    model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
-    model.addConstr(variables['k_deg_2'] == 1, name="Fix_k_deg_2")
-
-    # distributional constraints
-    model.addConstr(variables['pd1'].sum() <= 1, name="Dist_pd1")
-    model.addConstr(variables['pd2'].sum() <= 1, name="Dist_pd2")    
+    ) 
