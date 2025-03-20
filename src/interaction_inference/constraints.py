@@ -60,14 +60,19 @@ def add_variables(optimization, model, i):
 
     if 'p1' in staged_variables:
         variables['p1'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1), vtype=GRB.CONTINUOUS, name="p1", lb=0, ub=1)
+        model.addConstr(variables['p1'].sum() <= 1, name="Dist_p1")
     if 'p2' in staged_variables:
         variables['p2'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p2", lb=0, ub=1)
+        model.addConstr(variables['p2'].sum() <= 1, name="Dist_p2")
     if 'pg1' in staged_variables:
         variables['pg1'] = model.addMVar(shape=(2*(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1)), vtype=GRB.CONTINUOUS, name="pg1", lb=0, ub=1)
+        model.addConstr(variables['pg1'].sum() <= 1, name="Dist_pg1")
     if 'pg2' in staged_variables:
         variables['pg2'] = model.addMVar(shape=(2*(optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1)), vtype=GRB.CONTINUOUS, name="pg2", lb=0, ub=1)
+        model.addConstr(variables['pg2'].sum() <= 1, name="Dist_pg2")
     if 'p' in staged_variables:
         variables['p'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1, optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p", lb=0, ub=1)
+        model.addConstr(variables['p'].sum() <= 1, name="Dist_p")
     if 'k_on_1' in staged_variables:
         variables['k_on_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_on_1", lb=0, ub=optimization.K)
     if 'k_on_2' in staged_variables:
@@ -91,10 +96,13 @@ def add_variables(optimization, model, i):
 
     if 'pd1' in staged_variables:
         variables['pd1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd1", lb=0, ub=1)
+        model.addConstr(variables['pd1'].sum() <= 1, name="Dist_pd1")
     if 'pd2' in staged_variables:
         variables['pd2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd2", lb=0, ub=1)
+        model.addConstr(variables['pd2'].sum() <= 1, name="Dist_pd2")
     if 'pd' in staged_variables:
         variables['pd'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd", lb=0, ub=1)
+        model.addConstr(variables['pd'].sum() <= 1, name="Dist_pd")
     if 'fm1' in staged_variables:
         variables['fm1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm1", lb=0, ub=1)
     if 'fm2' in staged_variables:
@@ -224,6 +232,23 @@ def add_constraints(optimization, model, variables, i):
             model,
             variables
         )
+
+# ------------------------------------------------
+# Basic constraints
+# ------------------------------------------------
+
+def add_k_deg_1_constraints(model, variables):
+    model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
+
+def add_k_deg_2_constraints(model, variables):
+    model.addConstr(variables['k_deg_1'] == 1, name="Fix_k_deg_1")
+
+def add_k_reg_constraints(model, variables):
+    model.addConstr(variables['k_reg'] == 0, name="Fix_k_reg")
+
+# ------------------------------------------------
+# B method constraints
+# ------------------------------------------------
 
 def add_probability_constraints(model, variables, probs_OB, truncation_OB, truncation_OG, dataset_name):
 
@@ -554,6 +579,10 @@ def add_factorization_constraints(model, variables):
 
     # equate dummy joint variable to product of marginals: all original states
     model.addConstr(p == outer, name=f"Joint_factorize")
+
+# ------------------------------------------------
+# Moment constraints
+# ------------------------------------------------
 
 def add_dummy_moment_constraints(model, variables, moments_OB, beta):
 
