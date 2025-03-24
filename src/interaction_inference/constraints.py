@@ -192,7 +192,7 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.name
         )
     if "marginal_probability_2" in optimization.constraints:
-        add_marginal_probability_1_constraints(
+        add_marginal_probability_2_constraints(
             model,
             variables,
             optimization.dataset.probs_OB[f'sample-{i}'],
