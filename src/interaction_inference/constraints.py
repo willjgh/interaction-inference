@@ -71,7 +71,7 @@ def add_variables(optimization, model, i):
     if "downsampled_marginal_CME_1" in optimization.constraints:
         staged_variables.update(['pd1', 'fm1', 'k_tx_1', 'k_deg_1'])
     if "downsampled_marginal_CME_2" in optimization.constraints:
-        staged_variables.update(['pg2', 'fm2', 'k_tx_2', 'k_deg_2'])
+        staged_variables.update(['pd2', 'fm2', 'k_tx_2', 'k_deg_2'])
 
     # variable dict
     variables = {}
