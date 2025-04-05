@@ -81,7 +81,14 @@ class Optimization():
         for i in tqdm.tqdm(range(self.dataset.gene_pairs), disable=self.tqdm_disable):
 
             # optimize sample i
-            solution_dict[i] = self.optimize(i)
+            try:
+                solution_dict[i] = self.optimize(i)
+            except:
+                print("Optimization failed")
+                solution_dict[i] = {
+                    'status': None,
+                    'time': 0.0
+                }
 
         # store as attribute
         self.result_dict = solution_dict
