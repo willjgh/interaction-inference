@@ -626,3 +626,298 @@ def bootstrap_probabilities(sample, resamples=None, splits=1, thresh_OB=10, thre
     }
 
     return result_dict
+
+# ------------------------------------------------
+# Bootstrap probabilities (NEW)
+# ------------------------------------------------
+
+def bootstrap_joint_probabilities(sample, resamples=None, splits=1, thresh_OB=10, printing=False):
+    '''
+    Compute confidence intervals on the distribution of a sample of count pairs.
+
+    Compute confidence intervals for the joint probabilities of the 
+    sample using the percentile bootstrap and settings specified. Compute a state
+    space truncation using a given threshold on the number of samples per interval,
+    replacing intervals on probabilities of states outside the truncation by [0, 1]
+    to improve coverage.
+
+    Args:
+        sample: list of tuples (x1, x2) of integer counts per cell
+        resamples: integer number of bootstrap resamples to use
+        splits: integer number of times to 'split' resampling across
+                multiple arrays to avoid memory issues
+        thresh_OB: threshold on observation frequency of a state pair
+                   for state space truncation
+        print: toggle printing of observed state space truncation
+
+    Returns:
+        A dictionary containing results
+
+        Confidence intervals:
+    
+        'bounds': (2, _, _) numpy array of CI bounds on joint distribution
+
+        Truncation information:
+
+        truncation_OB:
+
+        'min_x1_OB', 'max_x1_OB', 'min_x2_OB', 'max_x2_OB': joint truncation
+    '''
+
+    # ------------------------------------------------------------------
+    # Setup
+    # ------------------------------------------------------------------
+
+    # get sample size
+    n = len(sample)
+
+    # get bootstrap size: default to sample size
+    if resamples is None:
+        resamples = n
+
+    # initialize random generator
+    rng = np.random.default_rng()
+
+    # convert string to tuple if neccessary (pandas reading csv to string)
+    if type(sample[0]) == str:
+        sample = [literal_eval(count_pair) for count_pair in sample]
+
+    # compute maximum x1 and x2 values
+    M, N = np.max(sample, axis=0)
+    M, N = int(M), int(N)
+
+    # map (x1, x2) pairs to integers: x2 + (N + 1) * x1
+    integer_sample = np.array([x[1] + (N + 1)*x[0] for x in sample], dtype='uint32')
+
+    # maxiumum of integer sample
+    D = (M + 1)*(N + 1) - 1
+
+    # ------------------------------------------------------------------
+    # Truncation
+    # ------------------------------------------------------------------
+
+    # count occurances per (x1, x2) in the in original sample
+    sample_counts = np.bincount(integer_sample, minlength=D + 1).reshape(M + 1, N + 1)
+
+    # set truncation bounds
+    min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = M, 0, N, 0
+
+    # set flag for changes
+    thresh_flag = False
+
+    # replace CI's for states below threshold occurances by [0, 1] bounds
+    for x1 in range(M + 1):
+        for x2 in range(N + 1):
+            # above: update truncation
+            if sample_counts[x1, x2] >= thresh_OB:
+                # check if smaller than current min
+                if x1 < min_x1_OB:
+                    min_x1_OB = x1
+                    thresh_flag = True
+                if x2 < min_x2_OB:
+                    min_x2_OB = x2
+                    thresh_flag = True
+                # check if larger than current max
+                if x1 > max_x1_OB:
+                    max_x1_OB = x1
+                    thresh_flag = True
+                if x2 > max_x2_OB:
+                    max_x2_OB = x2
+                    thresh_flag = True
+
+    # if no states were above threshold: default to max range, report
+    if not thresh_flag:
+        min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = 0, M, 0, N
+
+    # ------------------------------------------------------------------
+    # Bootstrap
+    # ------------------------------------------------------------------
+
+    # number of bootstrap samples per split (split to reduce memory usage)
+    resamples_split = resamples // splits
+
+    # setup count array for truncation
+    counts_trunc = np.empty((resamples, max_x1_OB - min_x1_OB + 1, max_x2_OB - min_x2_OB + 1), dtype='uint32')
+
+    # BS bootstrap samples: split into 'splits' number of BS_split x n arrays
+    for split in range(splits):
+
+        # BS_split bootstrap samples as BS_split x n array
+        bootstrap_split = rng.choice(integer_sample, size=(resamples_split, n))
+
+        # offset row i by (D + 1)i
+        bootstrap_split += np.arange(resamples_split, dtype='uint32')[:, None]*(D + 1)
+
+        # flatten, count occurances of each state and reshape, reversing map to give counts of each (x1, x2) pair
+        counts_split = np.bincount(bootstrap_split.ravel(), minlength=resamples_split*(D + 1)).reshape(-1, M + 1, N + 1)
+
+        # slice counts inside truncation box
+        counts_split_trunc = counts_split[:, min_x1_OB:(max_x1_OB + 1), min_x2_OB:(max_x2_OB + 1)]
+
+        # add to counts
+        counts_trunc[(split * resamples_split):((split + 1) * resamples_split), :, :] = counts_split_trunc
+
+    # compute 2.5% and 97.5% quantiles for each p(x1, x2), p(x1) and p(x2)
+    bounds_trunc = np.quantile(counts_trunc, [0.025, 0.975], axis=0)
+
+    # scale to probability
+    bounds_trunc = bounds_trunc / n
+
+    # ------------------------------------------------------------------
+    # Pad trunaction bounds to state space bounds
+    # ------------------------------------------------------------------
+
+    # state space bound array
+    bounds = np.empty((2, M + 1, N + 1))
+
+    # set CI's for states outside truncation to [0, 1], else use CI bounds
+    for i, x1 in enumerate(range(M + 1)):
+        for j, x2 in enumerate(range(N + 1)):
+            # below: set to [0, 1]
+            if sample_counts[x1, x2] < thresh_OB:
+                bounds[:, x1, x2] = [0.0, 1.0]
+            # above: use CI
+            else:
+                bounds[:, x1, x2] = bounds_trunc[:, x1 - min_x1_OB, x2 - min_x2_OB]
+
+    # ------------------------------------------------------------------
+    # Results
+    # ------------------------------------------------------------------
+    
+    # printing
+    if printing:
+        print(f"Box truncation: [{min_x1_OB}, {max_x1_OB}] x [{min_x2_OB}, {max_x2_OB}]")
+
+    # collect results
+    truncation_OB = {
+        'min_x1_OB': min_x1_OB,
+        'max_x1_OB': max_x1_OB,
+        'min_x2_OB': min_x2_OB,
+        'max_x2_OB': max_x2_OB
+    }
+
+    result_dict = {
+        'bounds': bounds,
+        'truncation_OB': truncation_OB,
+    }
+
+    return result_dict
+
+def bootstrap_marginal_probabilities(sample, resamples=None, splits=1, threshM_OB=10, printing=False):
+    '''
+    Compute confidence intervals on the distribution of a sample of count pairs.
+
+    Compute confidence intervals for the marginal probabilities of the 
+    sample using the percentile bootstrap and settings specified. Compute a state
+    space truncation using a given threshold on the number of samples per interval,
+    replacing intervals on probabilities of states outside the truncation by [0, 1]
+    to improve coverage.
+
+    Args:
+        sample: list of integer counts per cell
+        resamples: integer number of bootstrap resamples to use
+        splits: integer number of times to 'split' resampling across
+                multiple arrays to avoid memory issues
+        threshM_OB: threshold on observation frequency on a state for
+                    marginal state space truncation
+        print: toggle printing of observed state space truncation
+
+    Returns:
+        A dictionary containing results
+
+        Confidence intervals:
+
+        'bounds': (2, _) numpy array of CI bounds on marginal distribution
+
+        Truncation information:
+
+        truncationM_OB:
+
+        'minM_x_OB', 'maxM_x_OB': marginal truncation
+    '''
+
+    # get sample size
+    n = len(sample)
+
+    # get bootstrap size: default to sample size
+    if resamples is None:
+        resamples = n
+
+    # initialize random generator
+    rng = np.random.default_rng()
+
+    # compute maximum x value
+    M = np.max(sample)
+
+    # number of bootstrap samples per split (split to reduce memory usage)
+    resamples_split = resamples // splits
+
+    # setup count array
+    counts = np.empty((resamples, M + 1), dtype='uint32')
+
+    # BS bootstrap samples: split into 'splits' number of BS_split x n arrays
+    for split in range(splits):
+
+        # BS_split bootstrap samples as BS_split x n array
+        bootstrap_split = rng.choice(sample, size=(resamples_split, n))
+
+        # offset row i by (M + 1)i
+        bootstrap_split += np.arange(resamples_split, dtype='uint32')[:, None]*(M + 1)
+
+        # flatten, count occurances of each state and reshape, reversing map to give counts of each (x1, x2) pair
+        counts_split = np.bincount(bootstrap_split.ravel(), minlength=resamples_split*(M + 1)).reshape(-1, M + 1)
+
+        # add to counts
+        counts[(split * resamples_split):((split + 1) * resamples_split), :] = counts_split
+
+    # compute 2.5% and 97.5% quantiles for each p(x1, x2), p(x1) and p(x2)
+    bounds = np.quantile(counts, [0.025, 0.975], axis=0)
+
+    # scale to probability
+    bounds = bounds / n
+
+    # count occurances per (x1, x2) in the in original sample
+    sample_counts = np.bincount(sample, minlength=M + 1)
+
+    # set truncation bounds
+    minM_x_OB, maxM_x_OB = M, 0
+
+    # set flag for changes
+    thresh_flag = False
+
+    # replace CI's for states below threshold occurances by [0, 1] bounds
+    for x in range(M + 1):
+        # below: replace
+        if sample_counts[x] < threshM_OB:
+            bounds[:, x] = [0.0, 1.0]
+        # above: update truncation
+        else:
+            # check if smaller than current min
+            if x < minM_x_OB:
+                minM_x_OB = x
+                thresh_flag = True
+            # check if larger than current max
+            if x > maxM_x_OB:
+                maxM_x_OB = x
+                thresh_flag = True
+
+    # if no states were above threshold: default to max range, report
+    if not thresh_flag:
+        minM_x_OB, maxM_x_OB = 0, M
+
+    # printing
+    if printing:
+        print(f"Marginal truncation: [{minM_x_OB}, {maxM_x_OB}]")
+
+    # collect results
+    truncationM_OB = {
+        'minM_x_OB': minM_x_OB,
+        'maxM_x_OB': maxM_x_OB
+    }
+
+    result_dict = {
+        'bounds': bounds,
+        'truncationM_OB': truncationM_OB
+    }
+
+    return result_dict
