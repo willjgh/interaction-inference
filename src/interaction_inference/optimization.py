@@ -13,7 +13,7 @@ import tqdm
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
-
+import traceback
 from time import time
 
 # ------------------------------------------------
@@ -83,8 +83,15 @@ class Optimization():
             # optimize sample i
             try:
                 solution_dict[i] = self.optimize(i)
-            except:
-                print("Optimization failed")
+
+            # if exception
+            except Exception as e:
+
+                # display exception and traceback
+                print(f"Optimization failed: {e}\n")
+                print(traceback.format_exc())
+
+                # store default result
                 solution_dict[i] = {
                     'status': None,
                     'time': 0.0
