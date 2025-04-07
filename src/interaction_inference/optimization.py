@@ -88,8 +88,8 @@ class Optimization():
             except Exception as e:
 
                 # display exception and traceback
-                print(f"Optimization failed: {e}\n")
-                print(traceback.format_exc())
+                print(f"Optimization failed: {e}")
+                traceback.print_exception(e)
 
                 # store default result
                 solution_dict[i] = {
