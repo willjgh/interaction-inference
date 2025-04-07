@@ -220,8 +220,6 @@ class Dataset():
         For each sample in dataset compute bootstrap CI bounds on joint and
         marginal probabilities as well as observed truncation information,
         storing this in attributes of the dataset.
-
-        NOTE: currently both saves CI bounds arrays to file AND stores as attribute
         '''
 
         # collect OB truncations
@@ -257,21 +255,6 @@ class Dataset():
                 'x2_bounds': prob_results['x2_bounds']
             }
 
-            # OR:
-            # save CI bounds
-            #np.save(
-            #    f"./Temp/Bounds/Joint/{self.name}-sample-{i}.npy",
-            #    prob_results['bounds']
-            #)
-            #np.save(
-            #    f"./Temp/Bounds/x1_marginal/{self.name}-sample-{i}.npy",
-            #    prob_results['x1_bounds']
-            #)
-            #np.save(
-            #    f"./Temp/Bounds/x2_marginal/{self.name}-sample-{i}.npy",
-            #    prob_results['x2_bounds']
-            #)
-
         # store information
         self.truncation_OB = truncation_dict
         self.truncationM_OB = truncationM_dict
@@ -279,7 +262,7 @@ class Dataset():
 
     def compute_probabilities(self, display=False, tqdm_disable=True):
         '''
-        Additional setup needed for probability constraints.
+        Additional setup needed for B-method probability constraints.
         '''
 
         # bootstrap probabilities
@@ -304,3 +287,113 @@ class Dataset():
         # store information
         self.truncation_OG = truncation_OG
         self.prob_extent_OG = prob_extent_OG
+
+    def bootstrap_joint_probabilities(self, tqdm_disable=True):
+        '''
+        For each sample in dataset compute bootstrap CI bounds on joint
+        probabilities as well as observed truncation information,
+        storing this in attributes of the dataset.
+        '''
+
+        # collect OB truncations
+        truncation_dict = {}
+
+        # collect CI bounds if no existing dict
+        if not self.probs_OB:
+            probs_dict = {f'sample-{i}': {} for i in range(self.gene_pairs)}
+
+        # loop over samples
+        for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
+
+            # select sample
+            sample = list(self.count_dataset.loc[f'Gene-pair-{i}'])
+
+            # bootstrap probabilities
+            prob_results = bootstrap.bootstrap_joint_probabilities(
+                sample,
+                self.resamples,
+                self.splits,
+                self.thresh_OB
+            )
+
+            # store OB truncation
+            truncation_dict[f'sample-{i}'] = prob_results['truncation_OB']
+
+            # store bounds in new dict
+            if not self.probs_OB:
+                probs_dict[f'sample-{i}']['bounds'] = prob_results['bounds']
+
+            # or add to existing bounds dict
+            else:
+                self.probs_OB[f'sample-{i}']['bounds'] = prob_results['bounds']
+
+        # store information
+        self.truncation_OB = truncation_dict
+        if not self.probs_OB:
+            self.probs_OB = probs_dict
+
+    def bootstrap_marginal_probabilities(self, tqdm_disable=True):
+        '''
+        For each sample in dataset compute bootstrap CI bounds on marginal
+        probabilities as well as observed truncation information,
+        storing this in attributes of the dataset.
+        '''
+
+        # collect OB truncations
+        truncationM_dict = {}
+
+        # collect CI bounds if no existing dict
+        if not self.probs_OB:
+            probs_dict = {f'sample-{i}': {} for i in range(self.gene_pairs)}
+
+        # loop over samples
+        for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
+
+            # select sample
+            sample = list(self.count_dataset.loc[f'Gene-pair-{i}'])
+
+            # split into x1 and x2 samples
+            x1_sample = [x[0] for x in sample]
+            x2_sample = [x[1] for x in sample]
+
+            # bootstrap marginal probabilities for x1
+            prob_results_x1 = bootstrap.bootstrap_marginal_probabilities(
+                x1_sample,
+                self.resamples,
+                self.splits,
+                self.threshM_OB
+            )
+
+            # bootstrap marginal probabilities for x2
+            prob_results_x2 = bootstrap.bootstrap_marginal_probabilities(
+                x2_sample,
+                self.resamples,
+                self.splits,
+                self.threshM_OB
+            )
+
+            # combine marginal truncations
+            truncationM_OB = {
+                'minM_x1_OB': prob_results_x1['truncationM_OB']['minM_x_OB'],
+                'maxM_x1_OB': prob_results_x1['truncationM_OB']['maxM_x_OB'],
+                'minM_x2_OB': prob_results_x2['truncationM_OB']['minM_x_OB'],
+                'maxM_x2_OB': prob_results_x2['truncationM_OB']['maxM_x_OB']
+            }
+
+            # store OB truncation
+            truncationM_dict[f'sample-{i}'] = truncationM_OB
+
+            # store bounds in new dict
+            if not self.probs_OB:
+                probs_dict[f'sample-{i}']['x1_bounds'] = prob_results_x1['bounds']
+                probs_dict[f'sample-{i}']['x2_bounds'] = prob_results_x2['bounds']
+
+            # or add to existing bounds dict
+            else:
+                self.probs_OB[f'sample-{i}']['x1_bounds'] = prob_results_x1['bounds']
+                self.probs_OB[f'sample-{i}']['x2_bounds'] = prob_results_x2['bounds']
+
+        # store information
+        self.truncationM_OB = truncationM_dict
+        if not self.probs_OB:
+            self.probs_OB = probs_dict
