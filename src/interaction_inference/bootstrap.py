@@ -250,6 +250,242 @@ def bootstrap_fm(sample, beta, resamples=None, thresh_OB=10, threshM_OB=10, prin
     return result_dict
 
 # ------------------------------------------------
+# Bootstrap fm's (NEW)
+# ------------------------------------------------
+
+def bootstrap_joint_fm(sample, beta, resamples=None, thresh_OB=10, printing=False):
+
+    # ------------------------------------------------------------------
+    # Setup
+    # ------------------------------------------------------------------
+
+    # get sample size
+    n = len(sample)
+
+    # get bootstrap size: default to sample size
+    if resamples is None:
+        resamples = n
+
+    # initialize random generator
+    rng = np.random.default_rng()
+
+    # convert string to tuple if neccessary (pandas reading csv to string)
+    if type(sample[0]) == str:
+        sample = [literal_eval(count_pair) for count_pair in sample]
+
+    # compute maximum x1 and x2 values
+    M, N = np.max(sample, axis=0)
+    M, N = int(M), int(N)
+
+    # map (x1, x2) pairs to integers: x2 + (N + 1) * x1
+    integer_sample = np.array([x[1] + (N + 1)*x[0] for x in sample], dtype='uint32')
+
+    # maxiumum of integer sample
+    D = (M + 1)*(N + 1) - 1
+
+    # ------------------------------------------------------------------
+    # Truncation
+    # ------------------------------------------------------------------
+
+    # count occurances per (x1, x2) in the in original sample
+    sample_counts = np.bincount(integer_sample, minlength=D + 1).reshape(M + 1, N + 1)
+    
+    # set truncation bounds
+    min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = M, 0, N, 0
+
+    # set flag for changes
+    thresh_flag = False
+
+    # replace CI's for states below threshold occurances by [0, 1] bounds
+    for x1 in range(M + 1):
+        for x2 in range(N + 1):
+            # above: update truncation
+            if sample_counts[x1, x2] >= thresh_OB:
+                # check if smaller than current min
+                if x1 < min_x1_OB:
+                    min_x1_OB = x1
+                    thresh_flag = True
+                if x2 < min_x2_OB:
+                    min_x2_OB = x2
+                    thresh_flag = True
+                # check if larger than current max
+                if x1 > max_x1_OB:
+                    max_x1_OB = x1
+                    thresh_flag = True
+                if x2 > max_x2_OB:
+                    max_x2_OB = x2
+                    thresh_flag = True
+
+    # if no states were above threshold: default to max range, report
+    if not thresh_flag:
+        min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = 0, M, 0, N
+
+    # ------------------------------------------------------------------
+    # Bootstrap
+    # ------------------------------------------------------------------
+
+    # setup f array
+    fm1m2 = np.empty((2, M + 1, N + 1))
+
+    # default all bounds to [0, 1]
+    fm1m2[0, :, :] = 0
+    fm1m2[1, :, :] = 1
+
+    # loop over states in truncation
+    for m1 in range(min_x1_OB, max_x1_OB + 1):
+        for m2 in range(min_x2_OB, max_x2_OB + 1):
+
+            # capture for cells with counts (m1, m2)
+            beta_m = beta[(sample == np.array([m1, m2])).sum(axis=1) == 2]
+
+            # if fewer than thresh observations: leave as [0, 1]
+            if beta_m.size < thresh_OB:
+
+                # move to next pair
+                continue
+
+            # otherwise: bootstrap resample
+            boot = rng.choice(beta_m, size=(resamples, len(beta_m)))
+
+            # estimate E[beta|(m1, m2)]
+            estimates = boot.mean(axis=1)
+
+            # quantile for confidence intervals
+            interval = np.quantile(estimates, [0.025, 0.975], axis=0)
+
+            # store
+            fm1m2[:, m1, m2] = interval
+
+    # ------------------------------------------------------------------
+    # Results
+    # ------------------------------------------------------------------
+    
+    # printing
+    if printing:
+        print(f"Box truncation: [{min_x1_OB}, {max_x1_OB}] x [{min_x2_OB}, {max_x2_OB}]")
+
+    # collect results
+    truncation_OB = {
+        'min_x1_OB': min_x1_OB,
+        'max_x1_OB': max_x1_OB,
+        'min_x2_OB': min_x2_OB,
+        'max_x2_OB': max_x2_OB
+    }
+
+    result_dict = {
+        'fm1m2': fm1m2,
+        'truncation_OB': truncation_OB
+    }
+
+    return result_dict
+
+def bootstrap_marginal_fm(sample, beta, resamples=None, threshM_OB=10, printing=False):
+
+    # ------------------------------------------------------------------
+    # Setup
+    # ------------------------------------------------------------------
+
+    # get sample size
+    n = len(sample)
+
+    # get bootstrap size: default to sample size
+    if resamples is None:
+        resamples = n
+
+    # initialize random generator
+    rng = np.random.default_rng()
+
+    # compute maximum x value
+    M = np.max(sample)
+
+    # convert to numpy array for slicing
+    sample = np.array(sample)
+
+    # ------------------------------------------------------------------
+    # Truncation
+    # ------------------------------------------------------------------
+
+    # count occurances per x in the in original sample
+    sample_counts = np.bincount(sample, minlength=M + 1)
+    
+    # set truncation bounds
+    minM_x_OB, maxM_x_OB = M, 0
+
+    # set flag for changes
+    thresh_flag = False
+
+    for x in range(M + 1):
+        # above: update truncation
+        if sample_counts[x] >= threshM_OB:
+            # check if smaller than current min
+            if x < minM_x_OB:
+                minM_x_OB = x
+                thresh_flag = True
+            # check if larger than current max
+            if x > maxM_x_OB:
+                maxM_x_OB = x
+                thresh_flag = True
+
+    if not thresh_flag:
+        minM_x_OB, maxM_x_OB = 0, M
+
+    # ------------------------------------------------------------------
+    # Bootstrap
+    # ------------------------------------------------------------------
+
+    # setup f array
+    fm = np.empty((2, M + 1))
+
+    # default all bounds to [0, 1]
+    fm[0, :] = 0
+    fm[1, :] = 1
+
+    # loop over states in truncation
+    for m in range(minM_x_OB, maxM_x_OB + 1):
+
+        # capture for cells with count m
+        beta_m = beta[sample == m]
+
+        # if fewer than thresh observations: leave as [0, 1]
+        if beta_m.size < threshM_OB:
+
+            # move to next
+            continue
+
+        # otherwise: bootstrap resample
+        boot = rng.choice(beta_m, size=(resamples, len(beta_m)))
+
+        # estimate E[beta|m]
+        estimates = boot.mean(axis=1)
+
+        # quantile for confidence intervals
+        interval = np.quantile(estimates, [0.025, 0.975], axis=0)
+
+        # store
+        fm[:, m] = interval
+
+    # ------------------------------------------------------------------
+    # Results
+    # ------------------------------------------------------------------
+
+    # printing
+    if printing:
+        print(f"Marginal truncation: [{minM_x_OB}, {maxM_x_OB}]")
+
+    # collect results
+    truncationM_OB = {
+        'minM_x_OB': minM_x_OB,
+        'maxM_x_OB': maxM_x_OB
+    }
+
+    result_dict = {
+        'fm': fm,
+        'truncationM_OB': truncationM_OB
+    }
+
+    return result_dict
+
+# ------------------------------------------------
 # Bootstrap moments
 # ------------------------------------------------
 

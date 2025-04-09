@@ -178,6 +178,115 @@ class Dataset():
         self.truncation_OB = truncation_dict
         self.truncationM_OB = truncationM_dict
         self.fm_OB = fm_dict
+
+    def bootstrap_joint_fm(self, tqdm_disable=True):
+        '''
+        For each sample in dataset compute bootstrap CI bounds on fm1m2 = E[beta|(m1, m2)]
+        rates and compute observed truncation information, storing this in
+        attributes of the dataset.
+        '''
+
+        # collect OB truncations
+        truncation_dict = {}
+
+        # collect CI bounds if no existing dict
+        if not self.fm_OB:
+            fm_dict = {f'sample-{i}': {} for i in range(self.gene_pairs)}
+
+        # loop over samples
+        for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
+
+            # select sample
+            sample = list(self.count_dataset.loc[f'Gene-pair-{i}'])
+
+            # bootstrap probabilities
+            fm_results = bootstrap.bootstrap_joint_fm(
+                sample,
+                self.beta,
+                self.resamples,
+                self.thresh_OB
+            )
+
+            # store OB truncation
+            truncation_dict[f'sample-{i}'] = fm_results['truncation_OB']
+
+            # store bounds in new dict
+            if not self.fm_OB:
+                fm_dict[f'sample-{i}']['fm1m2'] = fm_results['fm1m2']
+
+            # or add to existing bounds dict
+            else:
+                self.fm_OB[f'sample-{i}']['fm1m2'] = fm_results['fm1m2']
+
+        # store information
+        self.truncation_OB = truncation_dict
+        if not self.fm_OB:
+            self.fm_OB = fm_dict
+
+    def bootstrap_marginal_fm(self, tqdm_disable=True):
+        '''
+        For each sample in dataset compute bootstrap CI bounds on fm = E[beta|m]
+        rates and compute observed truncation information, storing this in
+        attributes of the dataset.
+        '''
+        # collect OB truncations
+        truncationM_dict = {}
+
+        # collect CI bounds if no existing dict
+        if not self.fm_OB:
+            fm_dict = {f'sample-{i}': {} for i in range(self.gene_pairs)}
+
+        # loop over samples
+        for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
+
+            # select sample
+            sample = list(self.count_dataset.loc[f'Gene-pair-{i}'])
+
+            # split into x1 and x2 samples
+            x1_sample = [x[0] for x in sample]
+            x2_sample = [x[1] for x in sample]
+
+            # bootstrap marginal probabilities for x1
+            fm_results_x1 = bootstrap.bootstrap_marginal_fm(
+                x1_sample,
+                self.beta,
+                self.resamples,
+                self.threshM_OB
+            )
+
+            # bootstrap marginal probabilities for x2
+            fm_results_x2 = bootstrap.bootstrap_marginal_fm(
+                x2_sample,
+                self.beta,
+                self.resamples,
+                self.threshM_OB
+            )
+
+            # combine marginal truncations
+            truncationM_OB = {
+                'minM_x1_OB': fm_results_x1['truncationM_OB']['minM_x_OB'],
+                'maxM_x1_OB': fm_results_x1['truncationM_OB']['maxM_x_OB'],
+                'minM_x2_OB': fm_results_x2['truncationM_OB']['minM_x_OB'],
+                'maxM_x2_OB': fm_results_x2['truncationM_OB']['maxM_x_OB']
+            }
+
+            # store OB truncation
+            truncationM_dict[f'sample-{i}'] = truncationM_OB
+
+            # store bounds in new dict
+            if not self.fm_OB:
+                fm_dict[f'sample-{i}']['fm1'] = fm_results_x1['fm']
+                fm_dict[f'sample-{i}']['fm2'] = fm_results_x2['fm']
+
+            # or add to existing bounds dict
+            else:
+                self.fm_OB[f'sample-{i}']['fm1'] = fm_results_x1['fm']
+                self.fm_OB[f'sample-{i}']['fm2'] = fm_results_x2['fm']
+
+        # store information
+        self.truncationM_OB = truncationM_dict
+        if not self.fm_OB:
+            self.fm_OB = fm_dict
  
     def compute_moments(self, tqdm_disable=True):
         '''
