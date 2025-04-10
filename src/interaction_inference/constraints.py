@@ -59,7 +59,7 @@ def add_variables(optimization, model, i):
     if "dummy_moment" in optimization.constraints:
         staged_variables.update(['E_x1', 'E_x2'])
 
-    # downsampled constraints
+    # Downsampled constraints
     if "downsampled_probability" in optimization.constraints:
         staged_variables.update(['pd'])
     if "downsampled_marginal_probability_1" in optimization.constraints:
@@ -72,6 +72,20 @@ def add_variables(optimization, model, i):
         staged_variables.update(['pd1', 'fm1', 'k_tx_1', 'k_deg_1'])
     if "downsampled_marginal_CME_2" in optimization.constraints:
         staged_variables.update(['pd2', 'fm2', 'k_tx_2', 'k_deg_2'])
+
+    # Downsampled telegraph constraints
+    if "downsampled_TE_link" in optimization.constraints:
+        staged_variables.update(['pd', 'pgd'])
+    if "downsampled_marginal_TE_link_1" in optimization.constraints:
+        staged_variables.update(['pd1', 'pgd1'])
+    if "downsampled_marginal_TE_link_2" in optimization.constraints:
+        staged_variables.update(['pd2', 'pgd2'])
+    if "downsampled_CME_TE" in optimization.constraints:
+        staged_variables.update(['pgd', 'fm', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
+    if "downsampled_marginal_CME_TE_1" in optimization.constraints:
+        staged_variables.update(['pgd1', 'fm1', 'k_on_1', 'k_off_1', 'k_tx_1', 'k_deg_1'])
+    if "downsampled_marginal_CME_TE_2" in optimization.constraints:
+        staged_variables.update(['pgd2', 'fm2', 'k_on_2', 'k_off_2', 'k_tx_2', 'k_deg_2'])
 
     # variable dict
     variables = {}
@@ -126,6 +140,16 @@ def add_variables(optimization, model, i):
         variables['pd'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd", lb=0, ub=1)
         model.addConstr(variables['pd'].sum() <= 1, name="Dist_pd")
     
+    if 'pgd1' in staged_variables:
+        variables['pgd1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1, 2), vtype=GRB.CONTINUOUS, name="pgd1", lb=0, ub=1)
+        model.addConstr(variables['pgd1'].sum() <= 1, name="Dist_pgd1")
+    if 'pgd2' in staged_variables:
+        variables['pgd2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x2_OB'] + 1, 2), vtype=GRB.CONTINUOUS, name="pgd2", lb=0, ub=1)
+        model.addConstr(variables['pgd2'].sum() <= 1, name="Dist_pgd2")
+    if 'pgd' in staged_variables:
+        variables['pgd'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1, 2, 2), vtype=GRB.CONTINUOUS, name="pgd", lb=0, ub=1)
+        model.addConstr(variables['pgd'].sum() <= 1, name="Dist_pgd")
+
     if 'fm1' in staged_variables:
         variables['fm1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm1", lb=0, ub=1)
     if 'fm2' in staged_variables:
@@ -296,6 +320,47 @@ def add_constraints(optimization, model, variables, i):
         )
     if "downsampled_marginal_CME_2" in optimization.constraints:
         add_downsampled_marginal_CME_2_constraints(
+            model,
+            variables,
+            optimization.dataset.fm_OB[f'sample-{i}'],
+            optimization.dataset.truncationM_OB[f'sample-{i}']
+        )
+
+    # Downsampled telegraph constraints
+    if "downsampled_TE_link" in optimization.constraints:
+        add_downsampled_TE_link_constraints(
+            model,
+            variables,
+            optimization.dataset.truncation_OB[f'sample-{i}']
+        )
+    if "downsampled_marginal_TE_link_1" in optimization.constraints:
+        add_downsampled_marginal_TE_link_1_constraints(
+            model,
+            variables,
+            optimization.dataset.truncationM_OB[f'sample-{i}']
+        )
+    if "downsampled_marginal_TE_link_2" in optimization.constraints:
+        add_downsampled_marginal_TE_link_2_constraints(
+            model,
+            variables,
+            optimization.dataset.truncationM_OB[f'sample-{i}']
+        )
+    if "downsampled_CME_TE" in optimization.constraints:
+        add_downsampled_CME_TE_constraints(
+            model,
+            variables,
+            optimization.dataset.fm_OB[f'sample-{i}'],
+            optimization.dataset.truncation_OB[f'sample-{i}']
+        )
+    if "downsampled_marginal_CME_TE_1" in optimization.constraints:
+        add_downsampled_marginal_CME_TE_1_constraints(
+            model,
+            variables,
+            optimization.dataset.fm_OB[f'sample-{i}'],
+            optimization.dataset.truncationM_OB[f'sample-{i}']
+        )
+    if "downsampled_marginal_CME_TE_2" in optimization.constraints:
+        add_downsampled_marginal_CME_TE_2_constraints(
             model,
             variables,
             optimization.dataset.fm_OB[f'sample-{i}'],
@@ -753,6 +818,10 @@ def add_downsampled_marginal_probability_2_constraints(model, variables, probs_O
     model.addConstr(pd2 <= probs_OB['x2_bounds'][1, :max_x2_OB + 1], name="pd2_UB")
     model.addConstr(pd2 >= probs_OB['x2_bounds'][0, :max_x2_OB + 1], name="pd2_LB")
 
+# ------------------------------------------------
+# Downsampled constraints: Birth-Death
+# ------------------------------------------------
+
 def add_downsampled_CME_constraints(model, variables, fm_OB, truncation_OB):
 
     # get OB truncation for sample i 
@@ -895,4 +964,312 @@ def add_downsampled_marginal_CME_2_constraints(model, variables, fm_OB, truncati
             for x2_OB in range(1, max_x2_OB)
         ),
         name="CME_d_x1"
+    )
+
+# ------------------------------------------------
+# Downsampled constraints: Telegraph
+# ------------------------------------------------
+
+def add_downsampled_TE_link_constraints(model, variables, truncation_OB):
+
+    # get OB truncation for sample i
+    max_x1_OB = truncation_OB['max_x1_OB']
+    max_x2_OB = truncation_OB['max_x2_OB']
+
+    # get variables
+    pd = variables['pd']
+    pgd = variables['pgd']
+
+    # equate pd and pgd sums
+    model.addConstrs(
+        (
+            pd[x1_OB, x2_OB] == pgd[x1_OB, x2_OB, 0, 0] + pgd[x1_OB, x2_OB, 0, 1] + pgd[x1_OB, x2_OB, 1, 0] + pgd[x1_OB, x2_OB, 1, 1]
+            for x1_OB in range(max_x1_OB + 1)
+            for x2_OB in range(max_x2_OB + 1)
+        ),
+        name="TE_d_link"
+    )
+
+def add_downsampled_marginal_TE_link_1_constraints(model, variables, truncationM_OB):
+
+    # get OB truncation for sample i
+    max_x1_OB = truncationM_OB['maxM_x1_OB']
+
+    # get variables
+    pd1 = variables['pd1']
+    pgd1 = variables['pgd1']
+
+    # equate pd and pgd sums
+    model.addConstrs(
+        (
+            pd1[x1_OB] == pgd1[x1_OB, 0] + pgd1[x1_OB, 1]
+            for x1_OB in range(max_x1_OB + 1)
+        ),
+        name="TE_md_link"
+    )
+
+def add_downsampled_marginal_TE_link_2_constraints(model, variables, truncationM_OB):
+
+    # get OB truncation for sample i
+    max_x2_OB = truncationM_OB['maxM_x2_OB']
+
+    # get variables
+    pd2 = variables['pd2']
+    pgd2 = variables['pgd2']
+
+    # equate pd and pgd sums
+    model.addConstrs(
+        (
+            pd2[x2_OB] == pgd2[x2_OB, 0] + pgd2[x2_OB, 1]
+            for x2_OB in range(max_x2_OB + 1)
+        ),
+        name="TE_md_link"
+    )
+
+def add_downsampled_CME_TE_constraints(model, variables, fm_OB, truncation_OB):
+
+    # get OB truncation for sample i 
+    max_x1_OB = truncation_OB['max_x1_OB']
+    max_x2_OB = truncation_OB['max_x2_OB']
+
+    # get variables
+    pgd = variables['pgd']
+    fm = variables['fm']
+    k_on_1 = variables['k_on_1']
+    k_on_2 = variables['k_on_2']
+    k_off_1 = variables['k_off_1']
+    k_off_2 = variables['k_off_2']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_1']
+    k_deg_2 = variables['k_deg_2']
+    k_reg = variables['k_reg']
+
+    # fm rate bounds
+    model.addConstr(fm <= fm_OB['fm1m2'][1, :max_x1_OB + 1, :max_x2_OB + 1], name="fm_UB")
+    model.addConstr(fm >= fm_OB['fm1m2'][0, :max_x1_OB + 1, :max_x2_OB + 1], name="fm_LB")
+
+    # dummy zero variable for non-linear constraints
+    z = model.addVar()
+    model.addConstr(z == 0)
+    
+    # manually add x1_OB = x2_OB = 0 constraint (to avoid p(-1) terms)
+    model.addConstrs(
+        (
+            z == k_on_1 * g1 * pgd[0, 0, 1 - g1, g2] + \
+                 k_on_2 * g2 * pgd[0, 0, g1, 1 - g2] + \
+                 k_off_1 * (1 - g1) * pgd[0, 0, g1, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pgd[0, 0, 1 - g1, g2] + \
+                 k_deg_1 * pgd[1, 0, g1, g2] + \
+                 k_deg_2 * pgd[0, 1, g1, g2] + \
+                 k_reg * pgd[1, 1, g1, g2] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_on_2 * (1 - g2) + \
+                    k_off_1 * g1 + \
+                    k_off_2 * g2 + \
+                    k_tx_1 * g1 * fm[0, 0] + \
+                    k_tx_2 * g2 * fm[0, 0]
+                ) * pgd[0, 0, g1, g2]
+            for g1 in range(2)
+            for g2 in range(2)
+        ),
+        name="CME_TE_d_0_0"
+    )
+
+    # manually add x1_OB = 0 constraints (to avoid p(-1) terms)
+    model.addConstrs(
+        (
+            z == k_on_1 * g1 * pgd[0, x2_OB, 1 - g1, g2] + \
+                 k_on_2 * g2 * pgd[0, x2_OB, g1, 1 - g2] + \
+                 k_off_1 * (1 - g1) * pgd[0, x2_OB, g1, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pgd[0, x2_OB, 1 - g1, g2] + \
+                 k_tx_2 * g2 * fm[0, x2_OB - 1] * pgd[0, x2_OB - 1, g1, g2] + \
+                 k_deg_1 * pgd[1, x2_OB, g1, g2] + \
+                 k_deg_2 * (x2_OB + 1) * pgd[0, x2_OB + 1, g1, g2] + \
+                 k_reg * (x2_OB + 1) * pgd[1, x2_OB + 1, g1, g2] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_on_2 * (1 - g2) + \
+                    k_off_1 * g1 + \
+                    k_off_2 * g2 + \
+                    k_tx_1 * g1 * fm[0, x2_OB] + \
+                    k_tx_2 * g2 * fm[0, x2_OB] + \
+                    k_deg_2 * x2_OB
+                ) * pgd[0, x2_OB, g1, g2]
+            for x2_OB in range(1, max_x2_OB)
+            for g1 in range(2)
+            for g2 in range(2)
+        ),
+        name="CME_TE_d_0_x2"
+    )
+
+    # manually add x2_OB = 0 constraints (to avoid p(-1) terms)
+    model.addConstrs(
+        (
+            z == k_on_1 * g1 * pgd[x1_OB, 0, 1 - g1, g2] + \
+                 k_on_2 * g2 * pgd[x1_OB, 0, g1, 1 - g2] + \
+                 k_off_1 * (1 - g1) * pgd[x1_OB, 0, g1, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pgd[x1_OB, 0, 1 - g1, g2] + \
+                 k_tx_1 * g1 * fm[x1_OB - 1, 0] * pgd[x1_OB - 1, 0, g1, g2] + \
+                 k_deg_1 * (x1_OB + 1) * pgd[x1_OB + 1, 0, g1, g2] + \
+                 k_deg_2 * pgd[x1_OB, 1, g1, g2] + \
+                 k_reg * (x1_OB + 1) * pgd[x1_OB + 1, 1, g1, g2] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_on_2 * (1 - g2) + \
+                    k_off_1 * g1 + \
+                    k_off_2 * g2 + \
+                    k_tx_1 * g1 * fm[x1_OB, 0] + \
+                    k_tx_2 * g2 * fm[x1_OB, 0] + \
+                    k_deg_1 * x1_OB
+                ) * pgd[x1_OB, 0, g1, g2]
+            for x1_OB in range(1, max_x1_OB)
+            for g1 in range(2)
+            for g2 in range(2)
+        ),
+        name="CME_TE_d_x1_0"
+    )
+
+    # add TE CME constraints
+    model.addConstrs(
+        (
+            z == k_on_1 * g1 * pgd[x1_OB, x2_OB, 1 - g1, g2] + \
+                 k_on_2 * g2 * pgd[x1_OB, x2_OB, g1, 1 - g2] + \
+                 k_off_1 * (1 - g1) * pgd[x1_OB, x2_OB, g1, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pgd[x1_OB, x2_OB, 1 - g1, g2] + \
+                 k_tx_1 * g1 * fm[x1_OB - 1, x2_OB] * pgd[x1_OB - 1, x2_OB, g1, g2] + \
+                 k_tx_2 * g2 * fm[x1_OB, x2_OB - 1] * pgd[x1_OB, x2_OB - 1, g1, g2] + \
+                 k_deg_1 * (x1_OB + 1) * pgd[x1_OB + 1, x2_OB, g1, g2] + \
+                 k_deg_2 * (x2_OB + 1) * pgd[x1_OB, x2_OB + 1, g1, g2] + \
+                 k_reg * (x1_OB + 1) * (x2_OB + 1) * pgd[x1_OB + 1, x2_OB + 1, g1, g2] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_on_2 * (1 - g2) + \
+                    k_off_1 * g1 + \
+                    k_off_2 * g2 + \
+                    k_tx_1 * g1 * fm[x1_OB, x2_OB] + \
+                    k_tx_2 * g2 * fm[x1_OB, x2_OB] + \
+                    k_deg_1 * x1_OB + \
+                    k_deg_2 * x2_OB + \
+                    k_reg * x1_OB * x2_OB
+                ) * pgd[x1_OB, x2_OB, g1, g2]
+            for x1_OB in range(1, max_x1_OB)
+            for x2_OB in range(1, max_x2_OB)
+            for g1 in range(2)
+            for g2 in range(2)
+        ),
+        name="CME_TE_d_x1_x2"
+    )
+
+def add_downsampled_marginal_CME_TE_1_constraints(model, variables, fm_OB, truncationM_OB):
+    
+    # get OB truncation for sample i 
+    max_x1_OB = truncationM_OB['maxM_x1_OB']
+
+    # get variables
+    pgd1 = variables['pgd1']
+    fm1 = variables['fm1']
+    k_on_1 = variables['k_on_1']
+    k_off_1 = variables['k_off_1']
+    k_tx_1 = variables['k_tx_1']
+    k_deg_1 = variables['k_deg_1']
+
+    # fm rate bounds
+    model.addConstr(fm1 <= fm_OB['fm1'][1, :max_x1_OB + 1], name="fm1_UB")
+    model.addConstr(fm1 >= fm_OB['fm1'][0, :max_x1_OB + 1], name="fm1_LB")
+
+    # dummy zero variable for non-linear constraints
+    z = model.addVar()
+    model.addConstr(z == 0)
+
+    # manually add x1_OB = 0 constraint (to avoid p(-1))
+    model.addConstrs(
+        (
+            z == k_on_1 * g1 * pgd1[0, 1 - g1] + \
+                 k_off_1 * (1 - g1) * pgd1[0, g1] + \
+                 k_deg_1 * pgd1[1, g1] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_off_1 * g1 + \
+                    k_tx_1 * g1 * fm1[0]
+                ) * pgd1[0, g1]
+            for g1 in range(2)
+        ),
+        name="CME_TE_d_0"
+    )
+
+    # x1_OB CME
+    model.addConstrs(
+        (
+            z == k_on_1 * g1 * pgd1[x1_OB, 1 - g1] + \
+                 k_off_1 * (1 - g1) * pgd1[x1_OB, g1] + \
+                 k_tx_1 * g1 * fm1[x1_OB - 1] * pgd1[x1_OB - 1, g1] + \
+                 k_deg_1 * (x1_OB + 1) * pgd1[x1_OB + 1, g1] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_off_1 * g1 + \
+                    k_tx_1 * g1 * fm1[x1_OB] + \
+                    k_deg_1 * x1_OB
+                ) * pgd1[x1_OB, g1]
+            for x1_OB in range(1, max_x1_OB)
+            for g1 in range(2)
+        ),
+        name="CME_TE_d_x1"
+    )
+
+def add_downsampled_marginal_CME_TE_2_constraints(model, variables, fm_OB, truncationM_OB):
+    
+    # get OB truncation for sample i 
+    max_x2_OB = truncationM_OB['maxM_x2_OB']
+
+    # get variables
+    pgd2 = variables['pgd2']
+    fm2 = variables['fm2']
+    k_on_2 = variables['k_on_2']
+    k_off_2 = variables['k_off_2']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_2 = variables['k_deg_2']
+
+    # fm rate bounds
+    model.addConstr(fm2 <= fm_OB['fm2'][1, :max_x2_OB + 1], name="fm2_UB")
+    model.addConstr(fm2 >= fm_OB['fm2'][0, :max_x2_OB + 1], name="fm2_LB")
+
+    # dummy zero variable for non-linear constraints
+    z = model.addVar()
+    model.addConstr(z == 0)
+
+    # manually add x2_OB = 0 constraint (to avoid p(-1))
+    model.addConstrs(
+        (
+            z == k_on_2 * g2 * pgd2[0, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pgd2[0, g2] + \
+                 k_deg_2 * pgd2[1, g2] - \
+                (
+                    k_on_2 * (1 - g2) + \
+                    k_off_2 * g2 + \
+                    k_tx_2 * g2 * fm2[0]
+                ) * pgd2[0, g2]
+            for g2 in range(2)
+        ),
+        name="CME_TE_d_0"
+    )
+
+    # x1_OB CME
+    model.addConstrs(
+        (
+            z == k_on_2 * g2 * pgd2[x2_OB, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pgd2[x2_OB, g2] + \
+                 k_tx_2 * g2 * fm2[x2_OB - 1] * pgd2[x2_OB - 1, g2] + \
+                 k_deg_2 * (x2_OB + 1) * pgd2[x2_OB + 1, g2] - \
+                (
+                    k_on_2 * (1 - g2) + \
+                    k_off_2 * g2 + \
+                    k_tx_2 * g2 * fm2[x2_OB] + \
+                    k_deg_2 * x2_OB
+                ) * pgd2[x2_OB, g2]
+            for x2_OB in range(1, max_x2_OB)
+            for g2 in range(2)
+        ),
+        name="CME_TE_d_x2"
     )
