@@ -290,36 +290,27 @@ def bootstrap_joint_fm(sample, beta, resamples=None, thresh_OB=10, printing=Fals
     # count occurances per (x1, x2) in the in original sample
     sample_counts = np.bincount(integer_sample, minlength=D + 1).reshape(M + 1, N + 1)
     
-    # set truncation bounds
-    min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = M, 0, N, 0
+    # get indices with count >= threshold
+    x1_indices, x2_indices = np.where(sample_counts >= thresh_OB)
 
-    # set flag for changes
-    thresh_flag = False
-
-    # replace CI's for states below threshold occurances by [0, 1] bounds
-    for x1 in range(M + 1):
-        for x2 in range(N + 1):
-            # above: update truncation
-            if sample_counts[x1, x2] >= thresh_OB:
-                # check if smaller than current min
-                if x1 < min_x1_OB:
-                    min_x1_OB = x1
-                    thresh_flag = True
-                if x2 < min_x2_OB:
-                    min_x2_OB = x2
-                    thresh_flag = True
-                # check if larger than current max
-                if x1 > max_x1_OB:
-                    max_x1_OB = x1
-                    thresh_flag = True
-                if x2 > max_x2_OB:
-                    max_x2_OB = x2
-                    thresh_flag = True
-
-    # if no states were above threshold: default to max range, report
-    if not thresh_flag:
-        min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = 0, M, 0, N
+    # if no states above threshold: return None
+    if (x1_indices.size == 0) or (x2_indices.size == 0):
         if printing: print("No states above truncation threshold")
+        return {
+            'fm1m2': None,
+            'truncation_OB': {
+                'min_x1_OB': None,
+                'max_x1_OB': None,
+                'min_x2_OB': None,
+                'max_x2_OB': None
+            }
+        }
+
+    # get truncation box
+    min_x1_OB = x1_indices.min()
+    max_x1_OB = x1_indices.max()
+    min_x2_OB = x2_indices.min()
+    max_x2_OB = x2_indices.max()
 
     # if truncation [0, 0], set to [0, 1]
     if max_x1_OB == 0:
@@ -413,36 +404,32 @@ def bootstrap_marginal_fm(sample, beta, resamples=None, threshM_OB=10, printing=
     # ------------------------------------------------------------------
     # Truncation
     # ------------------------------------------------------------------
-
+    
     # count occurances per x in the in original sample
     sample_counts = np.bincount(sample, minlength=M + 1)
-    
-    # set truncation bounds
-    minM_x_OB, maxM_x_OB = M, 0
 
-    # set flag for changes
-    thresh_flag = False
+    # get indices with count >= threshold
+    indices = np.where(sample_counts >= threshM_OB)[0]
 
-    for x in range(M + 1):
-        # above: update truncation
-        if sample_counts[x] >= threshM_OB:
-            # check if smaller than current min
-            if x < minM_x_OB:
-                minM_x_OB = x
-                thresh_flag = True
-            # check if larger than current max
-            if x > maxM_x_OB:
-                maxM_x_OB = x
-                thresh_flag = True
-
-    if not thresh_flag:
-        minM_x_OB, maxM_x_OB = 0, M
+    # if no states above threshold: return None
+    if (indices.size == 0):
         if printing: print("No states above truncation threshold")
+        return {
+            'fm': None,
+            'truncationM_OB': {
+                'minM_x_OB': None,
+                'maxM_x_OB': None
+            }
+        }
+
+    # get truncation interval
+    minM_x_OB = indices.min()
+    maxM_x_OB = indices.max()
 
     # if truncation [0, 0], set to [0, 1]
     if maxM_x_OB == 0:
         maxM_x_OB = 1
-        if printing: print("Truncation extended from [0, 0] to [0, 1]")
+        print("Truncation extended from [0, 0] to [0, 1]")
 
     # ------------------------------------------------------------------
     # Bootstrap
@@ -949,37 +936,28 @@ def bootstrap_joint_probabilities(sample, resamples=None, splits=1, thresh_OB=10
 
     # count occurances per (x1, x2) in the in original sample
     sample_counts = np.bincount(integer_sample, minlength=D + 1).reshape(M + 1, N + 1)
+                                                                         
+    # get indices with count >= threshold
+    x1_indices, x2_indices = np.where(sample_counts >= thresh_OB)
 
-    # set truncation bounds
-    min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = M, 0, N, 0
-
-    # set flag for changes
-    thresh_flag = False
-
-    # replace CI's for states below threshold occurances by [0, 1] bounds
-    for x1 in range(M + 1):
-        for x2 in range(N + 1):
-            # above: update truncation
-            if sample_counts[x1, x2] >= thresh_OB:
-                # check if smaller than current min
-                if x1 < min_x1_OB:
-                    min_x1_OB = x1
-                    thresh_flag = True
-                if x2 < min_x2_OB:
-                    min_x2_OB = x2
-                    thresh_flag = True
-                # check if larger than current max
-                if x1 > max_x1_OB:
-                    max_x1_OB = x1
-                    thresh_flag = True
-                if x2 > max_x2_OB:
-                    max_x2_OB = x2
-                    thresh_flag = True
-
-    # if no states were above threshold: default to max range, report
-    if not thresh_flag:
-        min_x1_OB, max_x1_OB, min_x2_OB, max_x2_OB = 0, M, 0, N
+    # if no states above threshold: return None
+    if (x1_indices.size == 0) or (x2_indices.size == 0):
         if printing: print("No states above truncation threshold")
+        return {
+            'bounds': None,
+            'truncation_OB': {
+                'min_x1_OB': None,
+                'max_x1_OB': None,
+                'min_x2_OB': None,
+                'max_x2_OB': None
+            }
+        }
+
+    # get truncation box
+    min_x1_OB = x1_indices.min()
+    max_x1_OB = x1_indices.max()
+    min_x2_OB = x2_indices.min()
+    max_x2_OB = x2_indices.max()
 
     # if truncation [0, 0], set to [0, 1]
     if max_x1_OB == 0:
@@ -987,7 +965,7 @@ def bootstrap_joint_probabilities(sample, resamples=None, splits=1, thresh_OB=10
         if printing: print("Truncation for x1 extended from [0, 0] to [0, 1]")
     if max_x2_OB == 0:
         max_x2_OB = 1
-        if printing: print("Truncation for x2 extended from [0, 0] to [0, 1]")
+        if printing: print("Truncation for x2 extended from [0, 0] to [0, 1]")                                                        
 
     # ------------------------------------------------------------------
     # Bootstrap
@@ -1117,37 +1095,31 @@ def bootstrap_marginal_probabilities(sample, resamples=None, splits=1, threshM_O
     # Truncation
     # ------------------------------------------------------------------
 
-    # count occurances per (x1, x2) in the in original sample
+    # count occurances per x in the in original sample
     sample_counts = np.bincount(sample, minlength=M + 1)
 
-    # set truncation bounds
-    minM_x_OB, maxM_x_OB = M, 0
+    # get indices with count >= threshold
+    indices = np.where(sample_counts >= threshM_OB)[0]
 
-    # set flag for changes
-    thresh_flag = False
-
-    # replace CI's for states below threshold occurances by [0, 1] bounds
-    for x in range(M + 1):
-        # above: update truncation
-        if sample_counts[x] >= threshM_OB:
-            # check if smaller than current min
-            if x < minM_x_OB:
-                minM_x_OB = x
-                thresh_flag = True
-            # check if larger than current max
-            if x > maxM_x_OB:
-                maxM_x_OB = x
-                thresh_flag = True
-
-    # if no states were above threshold: default to max range, report
-    if not thresh_flag:
-        minM_x_OB, maxM_x_OB = 0, M
+    # if no states above threshold: return None
+    if (indices.size == 0):
         if printing: print("No states above truncation threshold")
+        return {
+            'bounds': None,
+            'truncationM_OB': {
+                'minM_x_OB': None,
+                'maxM_x_OB': None
+            }
+        }
+
+    # get truncation interval
+    minM_x_OB = indices.min()
+    maxM_x_OB = indices.max()
 
     # if truncation [0, 0], set to [0, 1]
     if maxM_x_OB == 0:
         maxM_x_OB = 1
-        if printing: print("Truncation extended from [0, 0] to [0, 1]")
+        print("Truncation extended from [0, 0] to [0, 1]")
 
     # ------------------------------------------------------------------
     # Bootstrap
