@@ -46,10 +46,14 @@ def add_variables(optimization, model, i):
         staged_variables.update(['p2', 'k_tx_2', 'k_deg_2'])
 
     # B method telegraph constraints
+    if "marginal_TE_equality" in optimization.constraints:
+        staged_variables.update(['p1', 'p2', 'pg1', 'pg2'])
+    if "TE_equality" in optimization.constraints:
+        staged_variables.update(['p', 'pg'])
     if "marginal_CME_TE" in optimization.constraints:
         staged_variables.update(['pg1', 'pg2', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
-    if "TE_equality" in optimization.constraints:
-        staged_variables.update(['p1', 'p2', 'pg1', 'pg2'])
+    if "CME_TE" in optimization.constraints:
+        staged_variables.update(['pg', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
 
     # Moment constraints
     if "moment" in optimization.constraints:
@@ -105,6 +109,9 @@ def add_variables(optimization, model, i):
     if 'p' in staged_variables:
         variables['p'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1, optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p", lb=0, ub=1)
         model.addConstr(variables['p'].sum() <= 1, name="Dist_p")
+    if 'pg' in staged_variables:
+        variables['pg'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1, optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1, 2, 2), vtype=GRB.CONTINUOUS, name="pg", lb=0, ub=1)
+        model.addConstr(variables['pg'].sum() <= 1, name="Dist_pg")
     
     if 'k_on_1' in staged_variables:
         variables['k_on_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_on_1", lb=0, ub=optimization.K)
@@ -244,14 +251,26 @@ def add_constraints(optimization, model, variables, i):
         )
 
     # B method telegraph constraints
-    if "marginal_CME_TE" in optimization.constraints:
-        add_marginal_CME_TE_constraints(
+    if "marginal_TE_equality" in optimization.constraints:
+        add_marginal_TE_equality_constraints(
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
         )
     if "TE_equality" in optimization.constraints:
         add_TE_equality_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+    if "marginal_CME_TE" in optimization.constraints:
+        add_marginal_CME_TE_constraints(
+            model,
+            variables,
+            optimization.overall_extent_OG[f'sample-{i}']
+        )
+    if "CME_TE" in optimization.constraints:
+        add_CME_TE_constraints(
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
@@ -618,6 +637,46 @@ def add_marginal_CME_2_constraints(model, variables, overall_extent_OG):
 # B method Telegraph constraints
 # ------------------------------------------------
 
+def add_marginal_TE_equality_constraints(model, variables, overall_extent_OG):
+
+    # use extent of threshold truncation for OG states
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
+
+    # get variables
+    p1 = variables['p1']
+    p2 = variables['p2']
+    pg1 = variables['pg1']
+    pg2 = variables['pg2']
+
+    # construct A matrices
+    A1 = np.repeat(np.eye(max_x1_OG + 1, dtype=int), repeats=2, axis=1)
+    A2 = np.repeat(np.eye(max_x2_OG + 1, dtype=int), repeats=2, axis=1)
+
+    # equate p1 and p2 to pg1 and pg2 sums
+    model.addConstr(p1 == A1 @ pg1)
+    model.addConstr(p2 == A2 @ pg2)
+
+def add_TE_equality_constraints(model, variables, overall_extent_OG):
+
+    # use extent of threshold truncation for OG states
+    max_x1_OG = overall_extent_OG['max_x1_OG']
+    max_x2_OG = overall_extent_OG['max_x2_OG']
+
+    # get variables
+    p = variables['p']
+    pg = variables['pg']
+
+    # equate p and pg sums
+    model.addConstrs(
+        (
+            p[x1_OG, x2_OG] == pg[x1_OG, x2_OG, 0, 0] + pg[x1_OG, x2_OG, 0, 1] + pg[x1_OG, x2_OG, 1, 0] + pg[x1_OG, x2_OG, 1, 1]
+            for x1_OG in range(max_x1_OG + 1)
+            for x2_OG in range(max_x2_OG + 1)
+        ),
+        name="TE_link"
+    )
+
 def add_marginal_CME_TE_constraints(model, variables, overall_extent_OG):
 
     # get extent of OG states
@@ -667,25 +726,132 @@ def add_marginal_CME_TE_constraints(model, variables, overall_extent_OG):
         name="Marginal_CME_x2"
     )
 
-def add_TE_equality_constraints(model, variables, overall_extent_OG):
+def add_CME_TE_constraints(model, variables, overall_extent_OG):
 
-    # use extent of threshold truncation for OG states
+    # get extent of OG states
     max_x1_OG = overall_extent_OG['max_x1_OG']
     max_x2_OG = overall_extent_OG['max_x2_OG']
 
     # get variables
-    p1 = variables['p1']
-    p2 = variables['p2']
-    pg1 = variables['pg1']
-    pg2 = variables['pg2']
+    pg = variables['pg']
+    k_on_1 = variables['k_on_1']
+    k_on_2 = variables['k_on_2']
+    k_off_1 = variables['k_off_1']
+    k_off_2 = variables['k_off_2']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_1']
+    k_deg_2 = variables['k_deg_2']
+    k_reg = variables['k_reg']
 
-    # construct A matrices
-    A1 = np.repeat(np.eye(max_x1_OG + 1, dtype=int), repeats=2, axis=1)
-    A2 = np.repeat(np.eye(max_x2_OG + 1, dtype=int), repeats=2, axis=1)
+    # manually add x1_OG = x2_OG = 0 constraint (to avoid p(-1) terms)
+    model.addConstrs(
+        (
+            0 == k_on_1 * g1 * pg[0, 0, 1 - g1, g2] + \
+                 k_on_2 * g2 * pg[0, 0, g1, 1 - g2] + \
+                 k_off_1 * (1 - g1) * pg[0, 0, g1, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pg[0, 0, 1 - g1, g2] + \
+                 k_deg_1 * pg[1, 0, g1, g2] + \
+                 k_deg_2 * pg[0, 1, g1, g2] + \
+                 k_reg * pg[1, 1, g1, g2] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_on_2 * (1 - g2) + \
+                    k_off_1 * g1 + \
+                    k_off_2 * g2 + \
+                    k_tx_1 * g1 + \
+                    k_tx_2 * g2
+                ) * pg[0, 0, g1, g2]
+            for g1 in range(2)
+            for g2 in range(2)
+        ),
+        name="CME_TE_0_0"
+    )
 
-    # equate p1 and p2 to pg1 and pg2 sums
-    model.addConstr(p1 == A1 @ pg1)
-    model.addConstr(p2 == A2 @ pg2)
+    # manually add x1_OG = 0 constraints (to avoid p(-1) terms)
+    model.addConstrs(
+        (
+            0 == k_on_1 * g1 * pg[0, x2_OG, 1 - g1, g2] + \
+                 k_on_2 * g2 * pg[0, x2_OG, g1, 1 - g2] + \
+                 k_off_1 * (1 - g1) * pg[0, x2_OG, g1, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pg[0, x2_OG, 1 - g1, g2] + \
+                 k_tx_2 * g2 * pg[0, x2_OG - 1, g1, g2] + \
+                 k_deg_1 * pg[1, x2_OG, g1, g2] + \
+                 k_deg_2 * (x2_OG + 1) * pg[0, x2_OG + 1, g1, g2] + \
+                 k_reg * (x2_OG + 1) * pg[1, x2_OG + 1, g1, g2] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_on_2 * (1 - g2) + \
+                    k_off_1 * g1 + \
+                    k_off_2 * g2 + \
+                    k_tx_1 * g1 + \
+                    k_tx_2 * g2 + \
+                    k_deg_2 * x2_OG
+                ) * pg[0, x2_OG, g1, g2]
+            for x2_OG in range(1, max_x2_OG)
+            for g1 in range(2)
+            for g2 in range(2)
+        ),
+        name="CME_TE_0_x2"
+    )
+
+    # manually add x2_OG = 0 constraints (to avoid p(-1) terms)
+    model.addConstrs(
+        (
+            0 == k_on_1 * g1 * pg[x1_OG, 0, 1 - g1, g2] + \
+                 k_on_2 * g2 * pg[x1_OG, 0, g1, 1 - g2] + \
+                 k_off_1 * (1 - g1) * pg[x1_OG, 0, g1, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pg[x1_OG, 0, 1 - g1, g2] + \
+                 k_tx_1 * g1 * pg[x1_OG - 1, 0, g1, g2] + \
+                 k_deg_1 * (x1_OG + 1) * pg[x1_OG + 1, 0, g1, g2] + \
+                 k_deg_2 * pg[x1_OG, 1, g1, g2] + \
+                 k_reg * (x1_OG + 1) * pg[x1_OG + 1, 1, g1, g2] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_on_2 * (1 - g2) + \
+                    k_off_1 * g1 + \
+                    k_off_2 * g2 + \
+                    k_tx_1 * g1 + \
+                    k_tx_2 * g2 + \
+                    k_deg_1 * x1_OG
+                ) * pg[x1_OG, 0, g1, g2]
+            for x1_OG in range(1, max_x1_OG)
+            for g1 in range(2)
+            for g2 in range(2)
+        ),
+        name="CME_TE_x1_0"
+    )
+
+    # add TE CME constraints
+    model.addConstrs(
+        (
+            0 == k_on_1 * g1 * pg[x1_OG, x2_OG, 1 - g1, g2] + \
+                 k_on_2 * g2 * pg[x1_OG, x2_OG, g1, 1 - g2] + \
+                 k_off_1 * (1 - g1) * pg[x1_OG, x2_OG, g1, 1 - g2] + \
+                 k_off_2 * (1 - g2) * pg[x1_OG, x2_OG, 1 - g1, g2] + \
+                 k_tx_1 * g1 * pg[x1_OG - 1, x2_OG, g1, g2] + \
+                 k_tx_2 * g2 * pg[x1_OG, x2_OG - 1, g1, g2] + \
+                 k_deg_1 * (x1_OG + 1) * pg[x1_OG + 1, x2_OG, g1, g2] + \
+                 k_deg_2 * (x2_OG + 1) * pg[x1_OG, x2_OG + 1, g1, g2] + \
+                 k_reg * (x1_OG + 1) * (x2_OG + 1) * pg[x1_OG + 1, x2_OG + 1, g1, g2] - \
+                (
+                    k_on_1 * (1 - g1) + \
+                    k_on_2 * (1 - g2) + \
+                    k_off_1 * g1 + \
+                    k_off_2 * g2 + \
+                    k_tx_1 * g1 + \
+                    k_tx_2 * g2 + \
+                    k_deg_1 * x1_OG + \
+                    k_deg_2 * x2_OG + \
+                    k_reg * x1_OG * x2_OG
+                ) * pg[x1_OG, x2_OG, g1, g2]
+            for x1_OG in range(1, max_x1_OG)
+            for x2_OG in range(1, max_x2_OG)
+            for g1 in range(2)
+            for g2 in range(2)
+        ),
+        name="CME_TE_x1_x2"
+    )
 
 # ------------------------------------------------
 # Moment constraints
