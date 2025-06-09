@@ -306,11 +306,15 @@ def compute_overall_extent(constraints, moment_extent, prob_extent):
     # flag if any moment / probability constraints used
     moment_flag = False
     prob_flag = False
-    for constr_name in constraints:
-        if 'moment' in constr_name:
-            moment_flag = True
-        if 'probability' in constr_name:
-            prob_flag = True
+    for constr_name, status in constraints.__dict__.items():
+        # active constraints
+        if status:
+            # involves moments
+            if 'moment' in constr_name:
+                moment_flag = True
+            # involves probabilities
+            if 'probability' in constr_name:
+                prob_flag = True
 
     # both are used: combine extents
     if moment_flag and prob_flag:

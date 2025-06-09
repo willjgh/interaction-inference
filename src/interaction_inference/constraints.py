@@ -9,6 +9,61 @@ Module for functions to add constraints to optimization model
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
+from dataclasses import dataclass, KW_ONLY
+
+# ------------------------------------------------
+# Constraint Names
+# ------------------------------------------------
+
+@dataclass
+class Constraint:
+    _: KW_ONLY
+
+    # base
+    k_deg_1: bool = False
+    k_deg_2: bool = False
+    k_reg: bool = False
+
+    # B method probabilities
+    factorization: bool = False
+    joint_probability: bool = False
+    probability: bool = False
+    marginal_probability_1: bool = False
+    marginal_probability_2: bool = False
+    
+    # B method birth-death
+    CME: bool = False
+    marginal_CME_1: bool = False
+    marginal_CME_2: bool = False
+
+    # B method telegraph
+    marginal_TE_equality: bool = False
+    TE_equality: bool = False
+    marginal_CME_TE: bool = False
+    CME_TE: bool = False
+
+    # Moments
+    moment: bool = False
+    higher_moment: bool = False
+    dummy_moment: bool = False
+
+    # Downsampled
+    downsampled_probability: bool = False
+    downsampled_marginal_probability_1: bool = False
+    downsampled_marginal_probability_2: bool = False
+    
+    # Downsampled birth-death
+    downsampled_CME: bool = False
+    downsampled_marginal_CME_1: bool = False
+    downsampled_marginal_CME_2: bool = False
+    
+    # Downsampled telegraph
+    downsampled_TE_link: bool = False
+    downsampled_marginal_TE_link_1: bool = False
+    downsampled_marginal_TE_link_2: bool = False
+    downsampled_CME_TE: bool = False
+    downsampled_marginal_CME_TE_1: bool = False
+    downsampled_marginal_CME_TE_2: bool = False
 
 # ------------------------------------------------
 # Variables
@@ -20,75 +75,75 @@ def add_variables(optimization, model, i):
     staged_variables = set()
 
     # base constraints
-    if "k_deg_1" in optimization.constraints:
+    if optimization.constraints.k_deg_1:
         staged_variables.update(['k_deg_1'])
-    if "k_deg_2" in optimization.constraints:
+    if optimization.constraints.k_deg_2:
         staged_variables.update(['k_deg_2'])
-    if "k_reg" in optimization.constraints:
+    if optimization.constraints.k_reg:
         staged_variables.update(['k_reg'])
 
     # B method birth-death constraints
-    if "factorization" in optimization.constraints:
+    if optimization.constraints.factorization:
         staged_variables.update(['p', 'p1', 'p2'])
-    if "joint_probability" in optimization.constraints:
+    if optimization.constraints.joint_probability:
         staged_variables.update(['p'])
-    if "probability" in optimization.constraints:
+    if optimization.constraints.probability:
         staged_variables.update(['p1', 'p2'])
-    if "marginal_probability_1" in optimization.constraints:
+    if optimization.constraints.marginal_probability_1:
         staged_variables.update(['p1'])
-    if "marginal_probability_2" in optimization.constraints:
+    if optimization.constraints.marginal_probability_2:
         staged_variables.update(['p2'])
-    if "CME" in optimization.constraints:
+    if optimization.constraints.CME:
         staged_variables.update(['p', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
-    if "marginal_CME_1" in optimization.constraints:
+    if optimization.constraints.marginal_CME_1:
         staged_variables.update(['p1', 'k_tx_1', 'k_deg_1'])
-    if "marginal_CME_2" in optimization.constraints:
+    if optimization.constraints.marginal_CME_2:
         staged_variables.update(['p2', 'k_tx_2', 'k_deg_2'])
 
     # B method telegraph constraints
-    if "marginal_TE_equality" in optimization.constraints:
+    if optimization.constraints.marginal_TE_equality:
         staged_variables.update(['p1', 'p2', 'pg1', 'pg2'])
-    if "TE_equality" in optimization.constraints:
+    if optimization.constraints.TE_equality:
         staged_variables.update(['p', 'pg'])
-    if "marginal_CME_TE" in optimization.constraints:
+    if optimization.constraints.marginal_CME_TE:
         staged_variables.update(['pg1', 'pg2', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
-    if "CME_TE" in optimization.constraints:
+    if optimization.constraints.CME_TE:
         staged_variables.update(['pg', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
 
     # Moment constraints
-    if "moment" in optimization.constraints:
+    if optimization.constraints.moment:
         staged_variables.update(['p1', 'p2', 'E_x1', 'E_x2'])
-    if "higher_moment" in optimization.constraints:
+    if optimization.constraints.higher_moment:
         staged_variables.update(['p1', 'p2'])
-    if "dummy_moment" in optimization.constraints:
+    if optimization.constraints.dummy_moment:
         staged_variables.update(['E_x1', 'E_x2'])
 
     # Downsampled constraints
-    if "downsampled_probability" in optimization.constraints:
+    if optimization.constraints.downsampled_probability:
         staged_variables.update(['pd'])
-    if "downsampled_marginal_probability_1" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_probability_1:
         staged_variables.update(['pd1'])
-    if "downsampled_marginal_probability_2" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_probability_2:
         staged_variables.update(['pd2'])
-    if "downsampled_CME" in optimization.constraints:
+    if optimization.constraints.downsampled_CME:
         staged_variables.update(['pd', 'fm', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
-    if "downsampled_marginal_CME_1" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_CME_1:
         staged_variables.update(['pd1', 'fm1', 'k_tx_1', 'k_deg_1'])
-    if "downsampled_marginal_CME_2" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_CME_2:
         staged_variables.update(['pd2', 'fm2', 'k_tx_2', 'k_deg_2'])
 
     # Downsampled telegraph constraints
-    if "downsampled_TE_link" in optimization.constraints:
+    if optimization.constraints.downsampled_TE_link:
         staged_variables.update(['pd', 'pgd'])
-    if "downsampled_marginal_TE_link_1" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_TE_link_1:
         staged_variables.update(['pd1', 'pgd1'])
-    if "downsampled_marginal_TE_link_2" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_TE_link_2:
         staged_variables.update(['pd2', 'pgd2'])
-    if "downsampled_CME_TE" in optimization.constraints:
+    if optimization.constraints.downsampled_CME_TE:
         staged_variables.update(['pgd', 'fm', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
-    if "downsampled_marginal_CME_TE_1" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_CME_TE_1:
         staged_variables.update(['pgd1', 'fm1', 'k_on_1', 'k_off_1', 'k_tx_1', 'k_deg_1'])
-    if "downsampled_marginal_CME_TE_2" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_CME_TE_2:
         staged_variables.update(['pgd2', 'fm2', 'k_on_2', 'k_off_2', 'k_tx_2', 'k_deg_2'])
 
     # variable dict
@@ -173,29 +228,29 @@ def add_variables(optimization, model, i):
 def add_constraints(optimization, model, variables, i):
 
     # Base constraints
-    if "k_deg_1" in optimization.constraints:
+    if optimization.constraints.k_deg_1:
         add_k_deg_1_constraints(
             model,
             variables
         )
-    if "k_deg_2" in optimization.constraints:
+    if optimization.constraints.k_deg_2:
         add_k_deg_2_constraints(
             model,
             variables
         )
-    if "k_reg" in optimization.constraints:
+    if optimization.constraints.k_reg:
         add_k_reg_constraints(
             model,
             variables
         )
     
     # B method birth death constraints
-    if "factorization" in optimization.constraints:
+    if optimization.constraints.factorization:
         add_factorization_constraints(
             model,
             variables
         )
-    if "joint_probability" in optimization.constraints:
+    if optimization.constraints.joint_probability:
         add_joint_probability_constraints(
             model,
             variables,
@@ -204,7 +259,7 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.truncation_OG,
             optimization.dataset.name
         )
-    if "probability" in optimization.constraints:
+    if optimization.constraints.probability:
         add_probability_constraints(
             model,
             variables,
@@ -213,7 +268,7 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.truncation_OG,
             optimization.dataset.name
         )
-    if "marginal_probability_1" in optimization.constraints:
+    if optimization.constraints.marginal_probability_1:
         add_marginal_probability_1_constraints(
             model,
             variables,
@@ -222,7 +277,7 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.truncation_OG,
             optimization.dataset.name
         )
-    if "marginal_probability_2" in optimization.constraints:
+    if optimization.constraints.marginal_probability_2:
         add_marginal_probability_2_constraints(
             model,
             variables,
@@ -231,19 +286,19 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.truncation_OG,
             optimization.dataset.name
         )
-    if "CME" in optimization.constraints:
+    if optimization.constraints.CME:
         add_CME_constraints(
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
         )
-    if "marginal_CME_1" in optimization.constraints:
+    if optimization.constraints.marginal_CME_1:
         add_marginal_CME_1_constraints(
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
         )
-    if "marginal_CME_2" in optimization.constraints:
+    if optimization.constraints.marginal_CME_2:
         add_marginal_CME_2_constraints(
             model,
             variables,
@@ -251,25 +306,25 @@ def add_constraints(optimization, model, variables, i):
         )
 
     # B method telegraph constraints
-    if "marginal_TE_equality" in optimization.constraints:
+    if optimization.constraints.marginal_TE_equality:
         add_marginal_TE_equality_constraints(
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
         )
-    if "TE_equality" in optimization.constraints:
+    if optimization.constraints.TE_equality:
         add_TE_equality_constraints(
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
         )
-    if "marginal_CME_TE" in optimization.constraints:
+    if optimization.constraints.marginal_CME_TE:
         add_marginal_CME_TE_constraints(
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
         )
-    if "CME_TE" in optimization.constraints:
+    if optimization.constraints.CME_TE:
         add_CME_TE_constraints(
             model,
             variables,
@@ -277,7 +332,7 @@ def add_constraints(optimization, model, variables, i):
         )
 
     # Moment constraints
-    if "moment" in optimization.constraints:
+    if optimization.constraints.moment:
         add_moment_constraints(
             model,
             variables,
@@ -285,7 +340,7 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.moments_OB[f'sample-{i}'],
             optimization.dataset.beta
         )
-    if "higher_moment" in optimization.constraints:
+    if optimization.constraints.higher_moment:
         add_higher_moment_constraints(
             model,
             variables,
@@ -293,7 +348,7 @@ def add_constraints(optimization, model, variables, i):
             optimization.dataset.moments_OB[f'sample-{i}'],
             optimization.dataset.beta
         )
-    if "dummy_moment" in optimization.constraints:
+    if optimization.constraints.dummy_moment:
         add_dummy_moment_constraints(
             model,
             variables,
@@ -302,42 +357,42 @@ def add_constraints(optimization, model, variables, i):
         )
 
     # Downsampled constraints
-    if "downsampled_probability" in optimization.constraints:
+    if optimization.constraints.downsampled_probability:
         add_downsampled_probability_constraints(
             model,
             variables,
             optimization.dataset.probs_OB[f'sample-{i}'],
             optimization.dataset.truncation_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_probability_1" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_probability_1:
         add_downsampled_marginal_probability_1_constraints(
             model,
             variables,
             optimization.dataset.probs_OB[f'sample-{i}'],
             optimization.dataset.truncationM_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_probability_2" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_probability_2:
         add_downsampled_marginal_probability_2_constraints(
             model,
             variables,
             optimization.dataset.probs_OB[f'sample-{i}'],
             optimization.dataset.truncationM_OB[f'sample-{i}']
         )
-    if "downsampled_CME" in optimization.constraints:
+    if optimization.constraints.downsampled_CME:
         add_downsampled_CME_constraints(
             model,
             variables,
             optimization.dataset.fm_OB[f'sample-{i}'],
             optimization.dataset.truncation_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_CME_1" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_CME_1:
         add_downsampled_marginal_CME_1_constraints(
             model,
             variables,
             optimization.dataset.fm_OB[f'sample-{i}'],
             optimization.dataset.truncationM_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_CME_2" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_CME_2:
         add_downsampled_marginal_CME_2_constraints(
             model,
             variables,
@@ -346,39 +401,39 @@ def add_constraints(optimization, model, variables, i):
         )
 
     # Downsampled telegraph constraints
-    if "downsampled_TE_link" in optimization.constraints:
+    if optimization.constraints.downsampled_TE_link:
         add_downsampled_TE_link_constraints(
             model,
             variables,
             optimization.dataset.truncation_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_TE_link_1" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_TE_link_1:
         add_downsampled_marginal_TE_link_1_constraints(
             model,
             variables,
             optimization.dataset.truncationM_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_TE_link_2" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_TE_link_2:
         add_downsampled_marginal_TE_link_2_constraints(
             model,
             variables,
             optimization.dataset.truncationM_OB[f'sample-{i}']
         )
-    if "downsampled_CME_TE" in optimization.constraints:
+    if optimization.constraints.downsampled_CME_TE:
         add_downsampled_CME_TE_constraints(
             model,
             variables,
             optimization.dataset.fm_OB[f'sample-{i}'],
             optimization.dataset.truncation_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_CME_TE_1" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_CME_TE_1:
         add_downsampled_marginal_CME_TE_1_constraints(
             model,
             variables,
             optimization.dataset.fm_OB[f'sample-{i}'],
             optimization.dataset.truncationM_OB[f'sample-{i}']
         )
-    if "downsampled_marginal_CME_TE_2" in optimization.constraints:
+    if optimization.constraints.downsampled_marginal_CME_TE_2:
         add_downsampled_marginal_CME_TE_2_constraints(
             model,
             variables,
