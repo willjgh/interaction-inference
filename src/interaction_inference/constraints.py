@@ -45,6 +45,7 @@ class Constraint:
     # Moments
     moment: bool = False
     higher_moment: bool = False
+    third_moment: bool = False
     dummy_moment: bool = False
 
     # Downsampled
@@ -112,8 +113,11 @@ def add_variables(optimization, model, i):
 
     # Moment constraints
     if optimization.constraints.moment:
+        # NOTE: E variables used here as significantly speeds up product constraint
         staged_variables.update(['p1', 'p2', 'E_x1', 'E_x2'])
     if optimization.constraints.higher_moment:
+        staged_variables.update(['p1', 'p2'])
+    if optimization.constraints.third_moment:
         staged_variables.update(['p1', 'p2'])
     if optimization.constraints.dummy_moment:
         staged_variables.update(['E_x1', 'E_x2'])
@@ -342,6 +346,14 @@ def add_constraints(optimization, model, variables, i):
         )
     if optimization.constraints.higher_moment:
         add_higher_moment_constraints(
+            model,
+            variables,
+            optimization.dataset.moment_extent_OG[f'sample-{i}'],
+            optimization.dataset.moments_OB[f'sample-{i}'],
+            optimization.dataset.beta
+        )
+    if optimization.constraints.third_moment:
+        add_third_moment_constraints(
             model,
             variables,
             optimization.dataset.moment_extent_OG[f'sample-{i}'],
