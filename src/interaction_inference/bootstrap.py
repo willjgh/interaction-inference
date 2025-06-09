@@ -555,11 +555,18 @@ def bootstrap_moments(sample, beta, resamples=None):
 
     # mean over axis 1 to get E[X1**2], E[X2**2] for each resample
     square_means = np.mean(squares, axis=1)
+
+    # cube to get x1**3 and x2**3 counts
+    cubes = boot**3
+
+    # mean over axis 1 to get E[X1**3], E[X2**3] for each resample
+    cube_means = np.mean(cubes, axis=1)
     
     # quantiles over resamples
     mean_bounds = np.quantile(means, [0.025, 0.975], axis=0)
     prod_mean_bounds = np.quantile(prod_means, [0.025, 0.975], axis=0)
     square_mean_bounds = np.quantile(square_means, [0.025, 0.975], axis=0)
+    cube_mean_bounds = np.quantile(cube_means, [0.025, 0.975], axis=0)
 
     # moment bounds
     moments_OB = {
@@ -567,7 +574,9 @@ def bootstrap_moments(sample, beta, resamples=None):
         'E_x2': mean_bounds[:, 1],
         'E_x1_x2': prod_mean_bounds,
         'E_x1_sq': square_mean_bounds[:, 0],
-        'E_x2_sq': square_mean_bounds[:, 1]
+        'E_x2_sq': square_mean_bounds[:, 1],
+        'E_x1_cb': cube_mean_bounds[:, 0],
+        'E_x2_cb': cube_mean_bounds[:, 1]
     }
 
     # OG truncation information

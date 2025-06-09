@@ -978,6 +978,39 @@ def add_higher_moment_constraints(model, variables, moment_extent_OG, moments_OB
     model.addConstr(expr_E_x2_sq_OB <= moments_OB['E_x2_sq'][1], name="E_x2_sq_UB")
     model.addConstr(expr_E_x2_sq_OB >= moments_OB['E_x2_sq'][0], name="E_x2_sq_LB")
 
+def add_third_moment_constraints(model, variables, moment_extent_OG, moments_OB, beta):
+
+    # use extent of threshold truncation for OG states
+    max_x1_OG = moment_extent_OG['max_x1_OG']
+    max_x2_OG = moment_extent_OG['max_x2_OG']
+
+    # slice variables to truncation
+    p1_slice = variables['p1'][0: max_x1_OG + 1]
+    p2_slice = variables['p2'][0: max_x2_OG + 1]
+
+    # get capture efficiency moments
+    E_beta = np.mean(beta)
+    E_beta_sq = np.mean(beta**2)
+    E_beta_cb = np.mean(beta**3)
+
+    # expressions for moments (OG)
+    expr_E_x1_OG = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1))
+    expr_E_x2_OG = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1))
+    expr_E_x1_sq_OG = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1)**2)
+    expr_E_x2_sq_OG = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1)**2)
+    expr_E_x1_cb_OG = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1)**3)
+    expr_E_x2_cb_OG = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1)**3)
+
+    # expressions for moments (OB)
+    expr_E_x1_cb_OB = expr_E_x1_cb_OG*E_beta_cb + expr_E_x1_sq_OG*(3*E_beta_sq - 3*E_beta_cb) + expr_E_x1_OG*(2*E_beta_cb - 3*E_beta_sq + E_beta)
+    expr_E_x2_cb_OB = expr_E_x2_cb_OG*E_beta_cb + expr_E_x2_sq_OG*(3*E_beta_sq - 3*E_beta_cb) + expr_E_x2_OG*(2*E_beta_cb - 3*E_beta_sq + E_beta)
+
+    # moment bounds (OB CI)
+    model.addConstr(expr_E_x1_cb_OB <= moments_OB['E_x1_cb'][1], name="E_x1_cb_UB")
+    model.addConstr(expr_E_x1_cb_OB >= moments_OB['E_x1_cb'][0], name="E_x1_cb_LB")
+    model.addConstr(expr_E_x2_cb_OB <= moments_OB['E_x2_cb'][1], name="E_x2_cb_UB")
+    model.addConstr(expr_E_x2_cb_OB >= moments_OB['E_x2_cb'][0], name="E_x2_cb_LB")
+
 def add_dummy_moment_constraints(model, variables, moments_OB, beta):
 
     # get variables
