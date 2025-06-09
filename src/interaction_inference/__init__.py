@@ -1,4 +1,3 @@
 from .dataset import Dataset
-from .hypothesis import Hypothesis
-from .minimization import Minimization
+from .optimization import Optimization
 from .correlation import Correlation
