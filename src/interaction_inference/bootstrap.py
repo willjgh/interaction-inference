@@ -514,7 +514,8 @@ def bootstrap_moments(sample, beta, resamples=None):
 
         Truncation information:
 
-        'max_x1_OG', 'max_x2_OG': marginal truncation extent
+        'max_x1_OG', 'max_x2_OG': marginal truncation OG extent
+        'max_x1_OB', 'max_x2_OG': marginal truncation OB extent
     '''
 
     # get sample size
@@ -579,11 +580,19 @@ def bootstrap_moments(sample, beta, resamples=None):
         'E_x2_cb': cube_mean_bounds[:, 1]
     }
 
-    # OG truncation information
+    # truncation information
 
     # compute maximum x1 and x2 values
     max_x1_OB = int(np.max(x1_sample))
     max_x2_OB = int(np.max(x2_sample))
+
+    # moment OB truncation
+    truncation_OB = {
+        'min_x1_OB': 0,
+        'max_x1_OB': max_x1_OB + 1,
+        'min_x2_OB': 0,
+        'min_x2_OB': max_x2_OB + 1
+    }
 
     # mean capture efficiency
     E_beta = np.mean(beta)
@@ -603,6 +612,7 @@ def bootstrap_moments(sample, beta, resamples=None):
     # collect information
     result_dict = {
         'moments_OB': moments_OB,
+        'truncation_OB': truncation_OB,
         'truncation_OG': truncation_OG
     }
 
