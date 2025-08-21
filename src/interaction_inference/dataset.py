@@ -53,6 +53,7 @@ class Dataset():
 
         # moment bounds
         self.moments_OB = None
+        self.moment_extent_OB = None
         self.moment_extent_OG = None
 
         # probability bounds
@@ -291,7 +292,7 @@ class Dataset():
     def compute_moments(self, tqdm_disable=True):
         '''
         For each sample in dataset compute bootstrap CI bounds on moments
-        and compute original truncation information, storing this in attributes
+        and compute truncation information, storing this in attributes
         of the dataset.
         '''
 
@@ -299,7 +300,8 @@ class Dataset():
         moment_dict = {}
 
         # collect moment extent
-        extent_dict = {}
+        extent_dict_OB = {}
+        extent_dict_OG = {}
 
         # loop over samples
         for i in tqdm.tqdm(range(self.gene_pairs), disable=tqdm_disable):
@@ -317,12 +319,16 @@ class Dataset():
             # store moments
             moment_dict[f'sample-{i}'] = moment_results['moments_OB']
 
-            # store extent
-            extent_dict[f'sample-{i}'] = moment_results['truncation_OG']
+            # store OB extent
+            extent_dict_OB[f'sample-{i}'] = moment_results['truncation_OB']
+
+            # store OG extent
+            extent_dict_OG[f'sample-{i}'] = moment_results['truncation_OG']
 
         # store information
         self.moments_OB = moment_dict
-        self.moment_extent_OG = extent_dict
+        self.moment_extent_OB = extent_dict_OB
+        self.moment_extent_OG = extent_dict_OG
 
     def bootstrap_probabilities(self, tqdm_disable=True):
         '''
