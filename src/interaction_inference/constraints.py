@@ -66,6 +66,9 @@ class Constraint:
     downsampled_marginal_CME_TE_1: bool = False
     downsampled_marginal_CME_TE_2: bool = False
 
+    # testing
+    equality: bool = False
+
 # ------------------------------------------------
 # Variables
 # ------------------------------------------------
@@ -155,22 +158,40 @@ def add_variables(optimization, model, i):
 
     if 'p1' in staged_variables:
         variables['p1'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1), vtype=GRB.CONTINUOUS, name="p1", lb=0, ub=1)
-        model.addConstr(variables['p1'].sum() <= 1, name="Dist_p1")
+        if optimization.constraints.equality:
+            model.addConstr(variables['p1'].sum() == 1, name="Dist_p1")
+        else:
+            model.addConstr(variables['p1'].sum() <= 1, name="Dist_p1")
     if 'p2' in staged_variables:
         variables['p2'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p2", lb=0, ub=1)
-        model.addConstr(variables['p2'].sum() <= 1, name="Dist_p2")
+        if optimization.constraints.equality:
+            model.addConstr(variables['p2'].sum() == 1, name="Dist_p2")
+        else:
+            model.addConstr(variables['p2'].sum() <= 1, name="Dist_p2")
     if 'pg1' in staged_variables:
         variables['pg1'] = model.addMVar(shape=(2*(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1)), vtype=GRB.CONTINUOUS, name="pg1", lb=0, ub=1)
-        model.addConstr(variables['pg1'].sum() <= 1, name="Dist_pg1")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pg1'].sum() == 1, name="Dist_pg1")
+        else:
+            model.addConstr(variables['pg1'].sum() <= 1, name="Dist_pg1")
     if 'pg2' in staged_variables:
         variables['pg2'] = model.addMVar(shape=(2*(optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1)), vtype=GRB.CONTINUOUS, name="pg2", lb=0, ub=1)
-        model.addConstr(variables['pg2'].sum() <= 1, name="Dist_pg2")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pg2'].sum() == 1, name="Dist_pg2")
+        else:
+            model.addConstr(variables['pg2'].sum() <= 1, name="Dist_pg2")
     if 'p' in staged_variables:
         variables['p'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1, optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1), vtype=GRB.CONTINUOUS, name="p", lb=0, ub=1)
-        model.addConstr(variables['p'].sum() <= 1, name="Dist_p")
+        if optimization.constraints.equality:
+            model.addConstr(variables['p'].sum() == 1, name="Dist_p")
+        else:
+            model.addConstr(variables['p'].sum() <= 1, name="Dist_p")
     if 'pg' in staged_variables:
         variables['pg'] = model.addMVar(shape=(optimization.overall_extent_OG[f'sample-{i}']['max_x1_OG'] + 1, optimization.overall_extent_OG[f'sample-{i}']['max_x2_OG'] + 1, 2, 2), vtype=GRB.CONTINUOUS, name="pg", lb=0, ub=1)
-        model.addConstr(variables['pg'].sum() <= 1, name="Dist_pg")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pg'].sum() == 1, name="Dist_pg")
+        else:
+            model.addConstr(variables['pg'].sum() <= 1, name="Dist_pg")
     
     if 'k_on_1' in staged_variables:
         variables['k_on_1'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_on_1", lb=0, ub=optimization.K)
@@ -198,23 +219,41 @@ def add_variables(optimization, model, i):
 
     if 'pd1' in staged_variables:
         variables['pd1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd1", lb=0, ub=1)
-        model.addConstr(variables['pd1'].sum() <= 1, name="Dist_pd1")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pd1'].sum() == 1, name="Dist_pd1")
+        else:
+            model.addConstr(variables['pd1'].sum() <= 1, name="Dist_pd1")
     if 'pd2' in staged_variables:
         variables['pd2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd2", lb=0, ub=1)
-        model.addConstr(variables['pd2'].sum() <= 1, name="Dist_pd2")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pd2'].sum() == 1, name="Dist_pd2")
+        else:
+            model.addConstr(variables['pd2'].sum() <= 1, name="Dist_pd2")
     if 'pd' in staged_variables:
         variables['pd'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1), vtype=GRB.CONTINUOUS, name="pd", lb=0, ub=1)
-        model.addConstr(variables['pd'].sum() <= 1, name="Dist_pd")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pd'].sum() == 1, name="Dist_pd")
+        else:
+            model.addConstr(variables['pd'].sum() <= 1, name="Dist_pd")
     
     if 'pgd1' in staged_variables:
         variables['pgd1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1, 2), vtype=GRB.CONTINUOUS, name="pgd1", lb=0, ub=1)
-        model.addConstr(variables['pgd1'].sum() <= 1, name="Dist_pgd1")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pgd1'].sum() == 1, name="Dist_pgd1")
+        else:
+            model.addConstr(variables['pgd1'].sum() <= 1, name="Dist_pgd1")
     if 'pgd2' in staged_variables:
         variables['pgd2'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x2_OB'] + 1, 2), vtype=GRB.CONTINUOUS, name="pgd2", lb=0, ub=1)
-        model.addConstr(variables['pgd2'].sum() <= 1, name="Dist_pgd2")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pgd2'].sum() == 1, name="Dist_pgd2")
+        else:
+            model.addConstr(variables['pgd2'].sum() <= 1, name="Dist_pgd2")
     if 'pgd' in staged_variables:
         variables['pgd'] = model.addMVar(shape=(optimization.dataset.truncation_OB[f'sample-{i}']['max_x1_OB'] + 1, optimization.dataset.truncation_OB[f'sample-{i}']['max_x2_OB'] + 1, 2, 2), vtype=GRB.CONTINUOUS, name="pgd", lb=0, ub=1)
-        model.addConstr(variables['pgd'].sum() <= 1, name="Dist_pgd")
+        if optimization.constraints.equality:
+            model.addConstr(variables['pgd'].sum() == 1, name="Dist_pgd")
+        else:
+            model.addConstr(variables['pgd'].sum() <= 1, name="Dist_pgd")
 
     if 'fm1' in staged_variables:
         variables['fm1'] = model.addMVar(shape=(optimization.dataset.truncationM_OB[f'sample-{i}']['maxM_x1_OB'] + 1), vtype=GRB.CONTINUOUS, name="fm1", lb=0, ub=1)
@@ -510,8 +549,12 @@ def add_joint_probability_constraints(model, variables, probs_OB, truncation_OB,
             # slice variables to truncation
             p_slice = variables['p'][min_x1_OG: max_x1_OG + 1, min_x2_OG: max_x2_OG + 1]
 
+            # elementwise multiply
+            terms = B_coeffs * p_slice
+
             # B matrix sum
-            sum_expr = gp.quicksum(B_coeffs * p_slice)
+            # nested sums as GUROBI changed quicksum to only sum over one axis
+            sum_expr = gp.quicksum(gp.quicksum(terms))
         
             # form constraints using CI bounds
             model.addConstr(sum_expr >= probs_OB['bounds'][0, x1_OB, x2_OB], name=f"B_lb_{x1_OB}_{x2_OB}")
@@ -919,6 +962,10 @@ def add_CME_TE_constraints(model, variables, overall_extent_OG):
         ),
         name="CME_TE_x1_x2"
     )
+
+# ------------------------------------------------
+# New Moment constraints
+# ------------------------------------------------
 
 # ------------------------------------------------
 # Moment constraints
