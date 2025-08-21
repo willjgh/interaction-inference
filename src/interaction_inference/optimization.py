@@ -43,7 +43,7 @@ status_codes = {
 # ------------------------------------------------
 
 class Optimization():
-    def __init__(self, dataset, constraints, license_file=None, time_limit=300, silent=True, K=100, tqdm_disable=False, print_solution=True):
+    def __init__(self, dataset, constraints, license_file=None, time_limit=300, silent=True, K=100, tqdm_disable=False, print_solution=True, compute_IIS=False, write_model=False):
         '''Initialize analysis settings and result storage.'''
         
         # store reference to dataset
@@ -59,6 +59,8 @@ class Optimization():
         self.K = K
         self.tqdm_disable = tqdm_disable
         self.print_solution = print_solution
+        self.compute_IIS = compute_IIS
+        self.write_model = write_model
 
         # analyse dataset
         self.analyse_dataset()
@@ -131,6 +133,10 @@ class Optimization():
 
                 # add constraints
                 constraints.add_constraints(self, model, variables, i)
+
+                # write model if needed
+                if self.write_model:
+                    model.write('model.lp')
                 
                 # optimize: test feasibility
                 model.setObjective(0, GRB.MINIMIZE)
@@ -144,6 +150,11 @@ class Optimization():
                     'status': status_codes[model.status],
                     'time': model.Runtime
                 }
+
+                # compute IIS if needed and infeasible
+                if (solution['status'] == "INFEASIBLE") and self.compute_IIS:
+                    model.computeIIS()
+                    model.write('iismodel.ilp')
 
         # print
         if self.print_solution:
