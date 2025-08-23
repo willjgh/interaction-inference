@@ -42,6 +42,13 @@ class Constraint:
     marginal_CME_TE: bool = False
     CME_TE: bool = False
 
+    # New Moments
+    moment_bound: bool = False
+    moment_link: bool = False
+    moment_sum: bool = False
+    moment_factorization: bool = False
+    moment_IBD: bool = False
+
     # Moments
     moment: bool = False
     higher_moment: bool = False
@@ -113,6 +120,18 @@ def add_variables(optimization, model, i):
         staged_variables.update(['pg1', 'pg2', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
     if optimization.constraints.CME_TE:
         staged_variables.update(['pg', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2', 'k_reg'])
+
+    # New Moment constraints
+    if optimization.constraints.moment_bound:
+        staged_variables.update(['E_x1_OB', 'E_x2_OB', 'E_x1_sq_OB', 'E_x2_sq_OB', 'E_x1_x2_OB'])
+    if optimization.constraints.moment_link:
+        staged_variables.update(['E_x1_OB', 'E_x1_OG', 'E_x2_OB', 'E_x2_OG', 'E_x1_sq_OB', 'E_x1_sq_OG', 'E_x2_sq_OB', 'E_x2_sq_OG' 'E_x1_x2_OB', 'E_x1_x2_OG'])
+    if optimization.constraints.moment_sum:
+        staged_variables.update(['E_x1_OG', 'E_x2_OG', 'E_x1_sq_OG', 'E_x2_sq_OG', 'p1', 'p2'])
+    if optimization.constraints.moment_factorization:
+        staged_variables.update(['E_x1_OG', 'E_x2_OG', 'E_x1_x2_OG'])
+    if optimization.constraints.moment_IBD:
+        staged_variables.update(['E_x1_OG', 'E_x2_OG', 'E_x1_sq_OG', 'E_x2_sq_OG', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
 
     # Moment constraints
     if optimization.constraints.moment:
@@ -211,6 +230,27 @@ def add_variables(optimization, model, i):
         variables['k_deg_2'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_deg_2", lb=0, ub=optimization.K)
     if 'k_reg' in staged_variables:
         variables['k_reg'] = model.addVar(vtype=GRB.CONTINUOUS, name="k_reg", lb=0, ub=optimization.K)
+
+    if 'E_x1_OB' in staged_variables:
+        variables['E_x1_OB'] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="E_x1_OB")
+    if 'E_x1_OG' in staged_variables:
+        variables['E_x1_OG'] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="E_x1_OG")
+    if 'E_x2_OB' in staged_variables:
+        variables['E_x2_OB'] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="E_x2_OB")
+    if 'E_x2_OG' in staged_variables:
+        variables['E_x2_OG'] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="E_x2_OG")
+    if 'E_x1_sq_OB' in staged_variables:
+        variables['E_x1_sq_OB'] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="E_x1_sq_OB")
+    if 'E_x1_sq_OG' in staged_variables:
+        variables['E_x1_sq_OG'] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="E_x1_sq_OG")
+    if 'E_x2_sq_OB' in staged_variables:
+        variables['E_x2_sq_OB'] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="E_x2_sq_OB")
+    if 'E_x2_sq_OG' in staged_variables:
+        variables['E_x2_sq_OG'] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="E_x2_sq_OG")
+    if 'E_x1_x2_OB' in staged_variables:
+        variables['E_x1_x2_OB'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x1_x2_OB")
+    if 'E_x1_x2_OG' in staged_variables:
+        variables['E_x1_x2_OG'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x1_x2_OG")
     
     if 'E_x1' in staged_variables:
         variables['E_x1'] = model.addVar(vtype=GRB.CONTINUOUS, name="E_x1")
@@ -372,6 +412,36 @@ def add_constraints(optimization, model, variables, i):
             model,
             variables,
             optimization.overall_extent_OG[f'sample-{i}']
+        )
+
+    # New Moment constraints
+    if optimization.constraints.moment_bound:
+        add_moment_bound_constraints(
+            model,
+            variables,
+            optimization.dataset.moments_OB[f'sample-{i}']
+        )
+    if optimization.constraints.moment_link:
+        add_moment_link_constraints(
+            model,
+            variables,
+            optimization.dataset.beta
+        )
+    if optimization.constraints.moment_sum:
+        add_moment_sum_constraints(
+            model,
+            variables,
+            optimization.dataset.moment_extent_OG[f'sample-{i}']
+        )
+    if optimization.constraints.moment_factorization:
+        add_moment_factorization_constraints(
+            model,
+            variables
+        )
+    if optimization.constraints.moment_IBD:
+        add_moment_IBD_constraints(
+            model,
+            variables
         )
 
     # Moment constraints
@@ -966,6 +1036,124 @@ def add_CME_TE_constraints(model, variables, overall_extent_OG):
 # ------------------------------------------------
 # New Moment constraints
 # ------------------------------------------------
+
+def add_moment_bound_constraints(model, variables, moments_OB):
+
+    # get variables
+    E_x1_OB = variables['E_x1_OB']
+    E_x2_OB = variables['E_x2_OB']
+    E_x1_sq_OB = variables['E_x1_sq_OB']
+    E_x2_sq_OB = variables['E_x2_sq_OB']
+    E_x1_x2_OB = variables['E_x1_x2_OB']
+
+    # moment bounds (OB CI)
+    model.addConstr(E_x1_OB <= moments_OB['E_x1'][1], name="E_x1_UB")
+    model.addConstr(E_x1_OB >= moments_OB['E_x1'][0], name="E_x1_LB")
+
+    model.addConstr(E_x2_OB <= moments_OB['E_x2'][1], name="E_x2_UB")
+    model.addConstr(E_x2_OB >= moments_OB['E_x2'][0], name="E_x2_LB")
+
+    model.addConstr(E_x1_sq_OB <= moments_OB['E_x1_sq'][1], name="E_x1_sq_UB")
+    model.addConstr(E_x1_sq_OB >= moments_OB['E_x1_sq'][0], name="E_x1_sq_LB")
+
+    model.addConstr(E_x2_sq_OB <= moments_OB['E_x2_sq'][1], name="E_x2_sq_UB")
+    model.addConstr(E_x2_sq_OB >= moments_OB['E_x2_sq'][0], name="E_x2_sq_LB")
+
+    model.addConstr(E_x1_x2_OB <= moments_OB['E_x1_x2'][1], name="E_x1_x2_UB")
+    model.addConstr(E_x1_x2_OB >= moments_OB['E_x1_x2'][0], name="E_x1_x2_LB")
+
+def add_moment_link_constraints(model, variables, beta):
+
+    # get variables
+    E_x1_OB = variables['E_x1_OB']
+    E_x1_OG = variables['E_x1_OG']
+    E_x2_OB = variables['E_x2_OB']
+    E_x2_OG = variables['E_x2_OG']
+    E_x1_sq_OB = variables['E_x1_sq_OB']
+    E_x1_sq_OG = variables['E_x1_sq_OG']
+    E_x2_sq_OB = variables['E_x2_sq_OB']
+    E_x2_sq_OG = variables['E_x2_sq_OG']
+    E_x1_x2_OB = variables['E_x1_x2_OB']
+    E_x1_x2_OG = variables['E_x1_x2_OG']
+
+    # get capture efficiency moments
+    E_beta = np.mean(beta)
+    E_beta_sq = np.mean(beta**2)
+
+    # OB to OG moment link
+    model.addConstr(E_x1_OB == E_x1_OG * E_beta, name="E_x1_OB_OG_link")
+    model.addConstr(E_x2_OB == E_x2_OG * E_beta, name="E_x2_OB_OG_link")
+
+    model.addConstr(E_x1_sq_OB == E_x1_sq_OG*E_beta_sq + E_x1_OG*(E_beta - E_beta_sq), name="E_x1_sq_OB_OG_link")
+    model.addConstr(E_x2_sq_OB == E_x2_sq_OG*E_beta_sq + E_x2_OG*(E_beta - E_beta_sq), name="E_x2_sq_OB_OG_link")
+
+    '''May not be correct'''
+    model.addConstr(E_x1_x2_OB == E_x1_x2_OG * E_beta_sq, name="E_x1_x2_OB_OG_link")
+
+def add_moment_sum_constraints(model, variables, moment_extent_OG):
+
+    # moment OG truncation for sample i
+    max_x1_OG = moment_extent_OG['max_x1_OG']
+    max_x2_OG = moment_extent_OG['max_x2_OG']
+
+    # get variables
+    E_x1_OG = variables['E_x1_OG']
+    E_x2_OG = variables['E_x2_OG']
+    E_x1_sq_OG = variables['E_x1_sq_OG']
+    E_x2_sq_OG = variables['E_x2_sq_OG']
+    p1 = variables['p1']
+    p2 = variables['p2']
+
+    # slice variables to truncation
+    p1_slice = p1[0: max_x1_OG + 1]
+    p2_slice = p2[0: max_x2_OG + 1]
+    
+    # expressions for moments (OG)
+    expr_E_x1_OG = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1))
+    expr_E_x2_OG = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1))
+    expr_E_x1_sq_OG = gp.quicksum(p1_slice * np.arange(max_x1_OG + 1)**2)
+    expr_E_x2_sq_OG = gp.quicksum(p2_slice * np.arange(max_x2_OG + 1)**2)
+
+    # equality constraints (OG)
+    model.addConstr(E_x1_OG == expr_E_x1_OG, name="E_x1_OG_sum")
+    model.addConstr(E_x2_OG == expr_E_x2_OG, name="E_x2_OG_sum")
+    model.addConstr(E_x1_sq_OG == expr_E_x1_sq_OG, name="E_x1_sq_OG_sum")
+    model.addConstr(E_x2_sq_OG == expr_E_x2_sq_OG, name="E_x2_sq_OG_sum")
+
+def add_moment_sum_downsampled_constraints(model, variables, moment_extent_OB):
+    pass
+
+def add_moment_factorization_constraints(model, variables):
+
+    # get variables
+    E_x1_OG = variables['E_x1_OG']
+    E_x2_OG = variables['E_x2_OG']
+    E_x1_x2_OG = variables['E_x1_x2_OG']
+
+    # factorization
+    model.addConstr(E_x1_x2_OG == E_x1_OG * E_x2_OG, name="Moment_factorization")
+
+def add_moment_IBD_constraints(model, variables):
+    
+    # get variables
+    E_x1_OG = variables['E_x1_OG']
+    E_x2_OG = variables['E_x2_OG']
+    E_x1_sq_OG = variables['E_x1_sq_OG']
+    E_x2_sq_OG = variables['E_x2_sq_OG']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_1']
+    k_deg_2 = variables['k_deg_2']
+
+    # parameter ratios
+    rho_x1 = k_tx_1 / k_deg_1
+    rho_x2 = k_tx_2 / k_deg_2
+
+    # analytic moment expressions
+    model.addConstr(E_x1_OG == rho_x1, name="E_x1_OG_analytic")
+    model.addConstr(E_x2_OG == rho_x2, name="E_x2_OG_analytic")
+    model.addConstr(E_x1_sq_OG == rho_x1 + rho_x1**2, name="E_x1_sq_OG_analytic")
+    model.addConstr(E_x2_sq_OG == rho_x2 + rho_x2**2, name="E_x2_sq_OG_analytic")
 
 # ------------------------------------------------
 # Moment constraints
