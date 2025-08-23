@@ -48,6 +48,7 @@ class Constraint:
     moment_sum: bool = False
     moment_factorization: bool = False
     moment_IBD: bool = False
+    moment_ITE: bool = False
 
     # Moments
     moment: bool = False
@@ -132,6 +133,8 @@ def add_variables(optimization, model, i):
         staged_variables.update(['E_x1_OG', 'E_x2_OG', 'E_x1_x2_OG'])
     if optimization.constraints.moment_IBD:
         staged_variables.update(['E_x1_OG', 'E_x2_OG', 'E_x1_sq_OG', 'E_x2_sq_OG', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
+    if optimization.constraints.moment_ITE:
+        staged_variables.update(['E_x1_OG', 'E_x2_OG', 'E_x1_sq_OG', 'E_x2_sq_OG', 'k_on_1', 'k_on_2', 'k_off_1', 'k_off_2', 'k_tx_1', 'k_tx_2', 'k_deg_1', 'k_deg_2'])
 
     # Moment constraints
     if optimization.constraints.moment:
@@ -439,6 +442,11 @@ def add_constraints(optimization, model, variables, i):
             variables
         )
     if optimization.constraints.moment_IBD:
+        add_moment_IBD_constraints(
+            model,
+            variables
+        )
+    if optimization.constraints.moment_ITE:
         add_moment_IBD_constraints(
             model,
             variables
@@ -1154,6 +1162,38 @@ def add_moment_IBD_constraints(model, variables):
     model.addConstr(E_x2_OG == rho_x2, name="E_x2_OG_analytic")
     model.addConstr(E_x1_sq_OG == rho_x1 + rho_x1**2, name="E_x1_sq_OG_analytic")
     model.addConstr(E_x2_sq_OG == rho_x2 + rho_x2**2, name="E_x2_sq_OG_analytic")
+
+def add_moment_ITE_constraint(model, variables):
+
+    # get variables
+    E_x1_OG = variables['E_x1_OG']
+    E_x2_OG = variables['E_x2_OG']
+    E_x1_sq_OG = variables['E_x1_sq_OG']
+    E_x2_sq_OG = variables['E_x2_sq_OG']
+    k_on_1 = variables['k_on_1']
+    k_on_2 = variables['k_on_2']
+    k_off_1 = variables['k_off_1']
+    k_off_2 = variables['k_off_2']
+    k_tx_1 = variables['k_tx_1']
+    k_tx_2 = variables['k_tx_2']
+    k_deg_1 = variables['k_deg_1']
+    k_deg_2 = variables['k_deg_2']
+
+    # parameter ratios
+    rho_x1 = k_tx_1 / k_deg_1
+    rho_x2 = k_tx_2 / k_deg_2
+
+    lam_x1 = k_on_1 / (k_on_1 + k_off_1)
+    lam_x2 = k_on_2 / (k_on_2 + k_off_2)
+
+    gam_x1 = (k_on_1 * (k_off_1 + k_deg_1)) / ((k_on_1 + k_off_1) * (k_on_1 + k_off_1 + k_deg_1))
+    gam_x2 = (k_on_2 * (k_off_2 + k_deg_2)) / ((k_on_2 + k_off_2) * (k_on_2 + k_off_2 + k_deg_2))
+
+    # analytic moment expressions
+    model.addConstr(E_x1_OG == rho_x1 * lam_x1, name="E_x1_OG_analytic")
+    model.addConstr(E_x2_OG == rho_x2 * lam_x2, name="E_x2_OG_analytic")
+    model.addConstr(E_x1_sq_OG == rho_x1 * lam_x1 + rho_x1**2 * gam_x1, name="E_x1_sq_OG_analytic")
+    model.addConstr(E_x2_sq_OG == rho_x2 * lam_x2 + rho_x2**2 * gam_x2, name="E_x2_sq_OG_analytic")
 
 # ------------------------------------------------
 # Moment constraints
