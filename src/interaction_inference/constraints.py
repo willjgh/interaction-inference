@@ -447,7 +447,7 @@ def add_constraints(optimization, model, variables, i):
             variables
         )
     if optimization.constraints.moment_ITE:
-        add_moment_IBD_constraints(
+        add_moment_ITE_constraints(
             model,
             variables
         )
@@ -1163,7 +1163,7 @@ def add_moment_IBD_constraints(model, variables):
     model.addConstr(E_x1_sq_OG == rho_x1 + rho_x1**2, name="E_x1_sq_OG_analytic")
     model.addConstr(E_x2_sq_OG == rho_x2 + rho_x2**2, name="E_x2_sq_OG_analytic")
 
-def add_moment_ITE_constraint(model, variables):
+def add_moment_ITE_constraints(model, variables):
 
     # get variables
     E_x1_OG = variables['E_x1_OG']
