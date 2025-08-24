@@ -126,7 +126,7 @@ def add_variables(optimization, model, i):
     if optimization.constraints.moment_bound:
         staged_variables.update(['E_x1_OB', 'E_x2_OB', 'E_x1_sq_OB', 'E_x2_sq_OB', 'E_x1_x2_OB'])
     if optimization.constraints.moment_link:
-        staged_variables.update(['E_x1_OB', 'E_x1_OG', 'E_x2_OB', 'E_x2_OG', 'E_x1_sq_OB', 'E_x1_sq_OG', 'E_x2_sq_OB', 'E_x2_sq_OG' 'E_x1_x2_OB', 'E_x1_x2_OG'])
+        staged_variables.update(['E_x1_OB', 'E_x1_OG', 'E_x2_OB', 'E_x2_OG', 'E_x1_sq_OB', 'E_x1_sq_OG', 'E_x2_sq_OB', 'E_x2_sq_OG', 'E_x1_x2_OB', 'E_x1_x2_OG'])
     if optimization.constraints.moment_sum:
         staged_variables.update(['E_x1_OG', 'E_x2_OG', 'E_x1_sq_OG', 'E_x2_sq_OG', 'p1', 'p2'])
     if optimization.constraints.moment_factorization:
