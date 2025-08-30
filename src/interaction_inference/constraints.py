@@ -45,6 +45,7 @@ class Constraint:
     # New Moments
     moment_bound: bool = False
     moment_link: bool = False
+    moment_marginal_joint_link: bool = False
     moment_sum: bool = False
     moment_factorization: bool = False
     moment_IBD: bool = False
@@ -127,6 +128,8 @@ def add_variables(optimization, model, i):
         staged_variables.update(['E_x1_OB', 'E_x2_OB', 'E_x1_sq_OB', 'E_x2_sq_OB', 'E_x1_x2_OB'])
     if optimization.constraints.moment_link:
         staged_variables.update(['E_x1_OB', 'E_x1_OG', 'E_x2_OB', 'E_x2_OG', 'E_x1_sq_OB', 'E_x1_sq_OG', 'E_x2_sq_OB', 'E_x2_sq_OG', 'E_x1_x2_OB', 'E_x1_x2_OG'])
+    if optimization.constraints.moment_marginal_joint_link:
+        staged_variables.update(['p', 'p1', 'p2'])
     if optimization.constraints.moment_sum:
         staged_variables.update(['E_x1_OG', 'E_x2_OG', 'E_x1_sq_OG', 'E_x2_sq_OG', 'p1', 'p2'])
     if optimization.constraints.moment_factorization:
@@ -429,6 +432,12 @@ def add_constraints(optimization, model, variables, i):
             model,
             variables,
             optimization.dataset.beta
+        )
+    if optimization.constraints.moment_marginal_joint_link:
+        add_moment_marginal_joint_link_constraints(
+            model,
+            variables,
+            optimization.dataset.moment_extent_OG[f'sample-{i}']
         )
     if optimization.constraints.moment_sum:
         add_moment_sum_constraints(
@@ -1097,6 +1106,34 @@ def add_moment_link_constraints(model, variables, beta):
 
     '''May not be correct'''
     model.addConstr(E_x1_x2_OB == E_x1_x2_OG * E_beta_sq, name="E_x1_x2_OB_OG_link")
+
+def add_moment_marginal_joint_link_constraints(model, variables, moment_extent_OG):
+
+    # moment OG truncation for sample i
+    max_x1_OG = moment_extent_OG['max_x1_OG']
+    max_x2_OG = moment_extent_OG['max_x2_OG']
+
+    # get variables
+    p = variables['p']
+    p1 = variables['p1']
+    p2 = variables['p2']
+
+    # equate marginals and joint
+    model.addConstrs(
+        (
+            p1[x1_OG] == gp.quicksum(p[x1_OG, x2_OG] for x2_OG in range(max_x2_OG + 1))
+            for x1_OG in range(max_x1_OG + 1)
+        ),
+        name="marginal_joint_link_x1"
+    )
+
+    model.addConstrs(
+        (
+            p2[x2_OG] == gp.quicksum(p[x1_OG, x2_OG] for x1_OG in range(max_x1_OG + 1))
+            for x2_OG in range(max_x2_OG + 1)
+        ),
+        name="marginal_joint_link_x2"
+    )
 
 def add_moment_sum_constraints(model, variables, moment_extent_OG):
 
